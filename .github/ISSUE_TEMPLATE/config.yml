@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "🔒 Güvenlik bildirimi · Security report"
+    url: https://github.com/Ilyas-jpg/saltay-kokpit/security/advisories/new
+    about: "Zafiyetleri public issue yerine buradan bildir · Report vulnerabilities here, not as a public issue"
+  - name: "📖 Dokümanlar · Docs"
+    url: https://github.com/Ilyas-jpg/saltay-kokpit/tree/main/docs
+    about: "Önce SSS'ye bak · Check the FAQ first (docs/09-sss.md)"

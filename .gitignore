@@ -1,0 +1,21 @@
+# saltay-kokpit — repository .gitignore
+# Patterns are anchored to the ROOT on purpose: templates/CLAUDE.md and
+# templates/project/.gitignore must stay tracked.
+
+# AI working files of the maintainer's own sessions — never pushed
+/CLAUDE.md
+/AGENTS.md
+/.claude/
+/scratchpad/
+/.shots/
+/.playwright-mcp/
+
+# backups produced by the Saltay hooks / curation
+.backups/
+.curation-trash-*/
+*.bak
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

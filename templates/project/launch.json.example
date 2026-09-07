@@ -1,0 +1,18 @@
+{
+  "_comment": "Claude Code Browser pane dev-server registry. This is one of the very few files that legitimately lives in a PROJECT-LOCAL .claude/ folder (it is project-specific). Copy to <projects-folder>/.claude/launch.json and add one entry per project. Static sites: `npx serve`. Frameworks: their own dev command.",
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "my-static-site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "4173", "C:/Users/you/Desktop/00-Projeler/Aktif/my-static-site"],
+      "port": 4173
+    },
+    {
+      "name": "my-next-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    }
+  ]
+}

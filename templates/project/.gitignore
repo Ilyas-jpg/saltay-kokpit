@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# saltay-kokpit · project .gitignore
+# Copy this into every new project BEFORE the first commit.
+# ---------------------------------------------------------------------------
+
+# dependencies / build
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env — real keys are never committed; the example file stays
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# ---------------------------------------------------------------------------
+# AI working files — NEVER pushed (especially to a public repo).
+# Be honest about using AI in the README; do not expose the workbench.
+# ---------------------------------------------------------------------------
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+.aider*
+scratchpad/
+.shots/
+.playwright-mcp/
+.backups/
+.curation-trash-*/
+*.bak
+
+# client-internal preparation notes (client name + shortcomings do not belong on the internet)
+NOTLAR-MUSTERI*.md
+CLIENT-NOTES*.md
