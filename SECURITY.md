@@ -14,9 +14,10 @@ altına yazan bir kurulum script'i** içerir. Bu yüzden güvenlik bildirimlerin
 
 **Bildirim**
 Bir zafiyet bulduysan (örn. hook'a sızan bir dosya adıyla komut enjeksiyonu, kurulumun yanlış
-yola yazması, sır tarayıcısının bir sırrı log'a düşürmesi) lütfen **public issue açma**:
-- GitHub'ın özel zafiyet bildirimi (*Security → Report a vulnerability*), ya da
-- e-posta: `info@algow.net` (konu: `saltay-kokpit security`).
+yola yazması, sır tarayıcısının bir sırrı log'a düşürmesi) lütfen **public issue açma**; GitHub'ın
+özel zafiyet bildirimini kullan:
+[Security → Report a vulnerability](https://github.com/Ilyas-jpg/saltay-kokpit/security/advisories/new).
+Bildirim yalnız depo sahibine görünür.
 
 72 saat içinde yanıt verilir. Düzeltme yayınlanana kadar ayrıntıyı gizli tutmanı rica ederiz;
 düzeltmede adın (istersen) `CHANGELOG.md`'de anılır.
@@ -41,9 +42,9 @@ This repository contains **hooks that run shell commands** on the user's machine
 **Reporting**
 If you found a vulnerability (e.g. command injection through a crafted file name reaching a hook,
 the installer writing to a wrong path, the secret scanner leaking a secret into a log), please
-**do not open a public issue**:
-- GitHub private vulnerability reporting (*Security → Report a vulnerability*), or
-- email: `info@algow.net` (subject: `saltay-kokpit security`).
+**do not open a public issue**; use GitHub private vulnerability reporting:
+[Security → Report a vulnerability](https://github.com/Ilyas-jpg/saltay-kokpit/security/advisories/new).
+Only the maintainer sees the report.
 
 You will get a reply within 72 hours. Please keep details private until a fix is released; with
 your consent you will be credited in `CHANGELOG.md`.

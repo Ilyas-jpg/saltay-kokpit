@@ -3,6 +3,13 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/), sürümleme [SemVer](https://semver.org/).
 Format follows Keep a Changelog; versions follow SemVer.
 
+## [Unreleased]
+
+### Değişti · Changed
+- `SECURITY.md`, `CODE_OF_CONDUCT.md`: güvenlik ve davranış bildirimleri yalnız GitHub'ın özel zafiyet
+  bildirimiyle alınır; e-posta adresi kaldırıldı · security and conduct reports go only through GitHub
+  private vulnerability reporting; the email address was removed.
+
 ## [1.1.0] — 2026-10-22
 
 Sistemin yedi haftalık gerçek kullanımından gelen güncelleme: anayasa sadeleşti, iki kural (skill,
@@ -95,5 +102,6 @@ constitution, two rules (skills, subagents) rewritten after incidents, 17 new le
   güvenlik ve yayın · Windows · SSS · 21 anonim ders.
 - README (TR + EN), MIT lisansı, katkı rehberi, davranış kuralları, güvenlik politikası, issue/PR şablonları.
 
+[Unreleased]: https://github.com/Ilyas-jpg/saltay-kokpit/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/Ilyas-jpg/saltay-kokpit/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Ilyas-jpg/saltay-kokpit/releases/tag/v1.0.0

@@ -17,8 +17,10 @@ Bu depo bir çalışma sistemini paylaşır; tartışmalar kişilerin değil kur
 - Tartışmayı kişiselleştirmek, ısrarla konu dışına çekmek.
 
 **Uygulama**
-İhlal gördüğünde depo sahibine yaz: `info@algow.net`. Bildirimler gizli tutulur. Yaptırım
-uyarıdan katkı yasağına kadar orantılı uygulanır; karar depo sahibinindir.
+İhlal gördüğünde depo sahibine GitHub'ın özel bildirim formundan yaz:
+[Security → Report a vulnerability](https://github.com/Ilyas-jpg/saltay-kokpit/security/advisories/new)
+(bildirim yalnız depo sahibine görünür). Bildirimler gizli tutulur. Yaptırım uyarıdan katkı yasağına
+kadar orantılı uygulanır; karar depo sahibinindir.
 
 ## 🇬🇧
 
@@ -37,5 +39,7 @@ not on people.
 - Making discussions personal or persistently derailing them.
 
 **Enforcement**
-Report violations to the maintainer: `info@algow.net`. Reports are kept confidential. Sanctions
-range proportionately from a warning to a contribution ban; the maintainer decides.
+Report violations to the maintainer through GitHub's private reporting form:
+[Security → Report a vulnerability](https://github.com/Ilyas-jpg/saltay-kokpit/security/advisories/new)
+(only the maintainer sees it). Reports are kept confidential. Sanctions range proportionately from a
+warning to a contribution ban; the maintainer decides.
