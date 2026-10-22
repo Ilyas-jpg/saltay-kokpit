@@ -1,0 +1,8 @@
+{
+  "_comment": "Hook commands an older saltay-kokpit release registered and this one replaces. scripts/install.sh fills in __CLAUDE_HOME__ and removes them from ~/.claude/settings.json by exact command match before merging settings.hooks.json, so an upgrade never leaves both versions running. Keys starting with _ are ignored.",
+  "_v1.0.0": "two UserPromptSubmit reminders (1.7 KB on every prompt) replaced by session-reminder.json in v1.1.0",
+  "UserPromptSubmit": [
+    "cat __CLAUDE_HOME__/behavior-check-reminder.json",
+    "cat __CLAUDE_HOME__/skill-check-reminder.json"
+  ]
+}

@@ -15,11 +15,11 @@
 |---|---|---|---|
 | `kullanici_profil` | Sen kimsin, nasıl çalışırsın | 1 (büyür) | Çekirdek; index'te açıklamasıyla görünür |
 | `kisisel_<konu>` | Aile, çevre, planlar, sağlık | az | İstersen. Kişisel bağlam tonu doğru kurar |
-| `feedback_<konu>` | Düzeltme / tercih → **Kural + Why + How to apply** | çok (yazarda 128) | **Bağlayıcı.** Hook hiçbir sıkışma seviyesinde bu adları kırpmaz |
-| `reference_<konu>` | Sunucu, hesap, panel, standart, marka | orta (51) | Tablo halinde; sırlar parola yöneticisinde |
-| `proje_<isim>` | Her projenin bağlamı, kararları, durumu | çok (89) | `status:` alanı: active / paused / live / archived |
+| `feedback_<konu>` | Düzeltme / tercih → **Kural + Why + How to apply** | çok (yazarda 188) | **Bağlayıcı.** Hook hiçbir sıkışma seviyesinde bu adları kırpmaz |
+| `reference_<konu>` | Sunucu, hesap, panel, standart, marka | orta (86) | Tablo halinde; sırlar parola yöneticisinde |
+| `proje_<isim>` | Her projenin bağlamı, kararları, durumu | çok (124) | `status:` alanı: active / paused / live / archived |
 | `HANDOFF_<isim>` | Oturumlar arası devir: runbook, deploy, "bir daha yapma" | az (12) | Uzun/aktif projelerin operasyonel ikizi |
-| `not_<konu>` | Karar günlüğü, olay, denetim, öğrenme | çok (76) | `not_kararlar` kronolojik tek dosya |
+| `not_<konu>` | Karar günlüğü, olay, denetim, öğrenme | çok (105) | `not_kararlar` kronolojik tek dosya |
 
 Prefix'ler kozmetik değil: `hooks/vault-index.sh` adları prefix'e göre bölümler ve bölümleri farklı
 önceliklerle sıkıştırır. Yeni bir prefix icat edersen index'te "Prefixsiz dosyalar" bölümüne düşer
@@ -46,12 +46,17 @@ description = "proje notu". İyi description = *"ornek-site.com — kurumsal sit
 | | Yalın index (hook) | Zengin index (`MEMORY.md`) |
 |---|---|---|
 | Kim üretir | `vault-index.sh`, her oturumda otomatik | Claude + sen, elle |
-| İçerik | not **adları** bölümlere ayrılmış, çekirdekte açıklama | her nota bir satır: link + kanca cümle + durum emojisi |
-| Boyut | ≤ 9.500 byte (kendini ölçer) | sınırsız (yazarda ~190 KB) |
+| İçerik | not **adları** bölümlere ayrılmış, çekirdekte açıklama | her nota **tek satır, tek cümle**: link + kanca + durum emojisi |
+| Boyut | ≤ 9.500 byte (kendini ölçer) | ölçülmez ama izlenir: ~100 KB'ı geçince oturumda açılmaz |
 | Amaç | "hangi notlar var" — koşulsuz görünürlük | "hangi not ne halde" — derinlik gerekince açılır |
 
 Yeni not yazınca hook onu kendiliğinden listeler; ekstra iş yok. Ama `MEMORY.md`'ye **tek satır**
 eklemeye devam et — Obsidian'da okunan, öyküsü olan index odur.
+
+**Zengin index de belgeye dönüşebilir.** Yazarın `MEMORY.md`'si haziranda 11,5 KB'tı; ekimde 224 KB'a,
+sonra 280 KB'ın üstüne çıktı. Her satır bir paragrafa dönüşmüştü: açmak bağlamın büyük bir kısmını
+yiyor, index olarak işe yaramıyordu ([10-dersler](10-dersler.md) #37). Kural: not başına tek cümle;
+büyüdüyse oturumda açma, Grep yap. `vault-health.sh` 100 KB'ta uyarır.
 
 ## Okuma protokolü (koşulsuz)
 
@@ -59,7 +64,7 @@ eklemeye devam et — Obsidian'da okunan, öyküsü olan index odur.
 2. Yoksa **`Grep`** (`grep -rli "<anahtar>" <vault>`; arşiv dahil).
 3. Kullanıcı / proje / tercih / hesap / karar / tasarım geçiyorsa ilgili notu **okumadan cevap yok**.
 4. Çakışma → kullanıcıya teyit → güncelle.
-5. Derinlik → `MEMORY.md`.
+5. Derinlik → `MEMORY.md` (büyüdüyse içinde Grep).
 
 **Grep > isim tahmini.** Yazarın vault'unda iki kez neredeyse duplike not üretildi: konu vault'ta
 başka bir adla zaten vardı. İsim tahmini yetmez, içerik grep'i şart.
@@ -113,9 +118,26 @@ ile ölç. Arşiv index dışıdır ama Grep bulur, wiki-link çalışır, `mv` 
 ## Büyüme gerçeği (yazarın sayıları)
 
 Nisan 20 · Mayıs 46 · Haziran 62 · Temmuz 86 · Ağustos 140 dosya dokunuldu. Vault 245 → 375 nota
-büyüdü. Bu hızda index ayda bir bakım ister; yukarıdaki seviyeler ve arşiv katmanı bu yüzden var.
+büyüdü (v1.0, eylül başı); yedi hafta sonra 534 kök not + 43 arşivde, `feedback_` 128 → 188. Bu hızda
+index ayda bir bakım ister; yukarıdaki seviyeler ve arşiv katmanı bu yüzden var. Yazarın index'i
+bugün seviye 4'te çalışıyor: proje ve not adları kısaltılmış, uyarı her oturumda görünür.
+
 Konsolidasyon da gerekir: 12 davranışsal `feedback_` notu tek bir "5 kanonik kural" notuna indirildi,
-eskiler `archive_superseded_by_5_kanonik/` altına taşındı.
+eskiler `archive_superseded_by_5_kanonik/` altına taşındı. Aynı ders tasarım kurallarında tekrarlandı:
+yedi olayın 16 KB'lık günlüğü her tasarım işinde baştan okunup kural yeniden çıkarılıyordu ve iki not
+birbiriyle çelişti. Kurallar tek, tarihli, çelişkisiz bir sete indirildi, günlük arşive gitti
+([10-dersler](10-dersler.md) #25). **Olay günlüğü kural değildir;** kural seti günlükten damıtılır.
+
+## Anayasadan vault'a taşınanlar (v1.1)
+
+Anayasa her oturumda yüklenir; orada yalnız davranış çekirdeği durur. Bayatlayan ya da yalnız gerektiğinde
+okunan bilgi vault'a taşındı ve şablon olarak geliyor:
+
+| Not | Ne tutar |
+|---|---|
+| `reference_kurulum_envanteri` | Skill / agent / komut / MCP sayma komutları, oturum başı yük tablosu, hook sözleşmesi. Sayılar buraya da yazılmaz, komutla alınır. |
+| `not_claude_md_revizyon_gecmisi` | Anayasanın değişiklik günlüğü; dosyada yalnız son "Son revize" satırı kalır. |
+| `reference_dogrulama_yuzeyi` | Ölçüm, kullanıcının gördüğü, gösterim, teslim, demo: hangi iş hangi araç. Birbirini çiğneten altı ayrı kuralın tek tablosu. |
 
 ## Sırlar
 

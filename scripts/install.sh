@@ -3,9 +3,10 @@
 # saltay-kokpit · scripts/install.sh
 #
 # Installs the four layers: vault (memory) · CLAUDE.md (constitution) ·
-# hooks + reminders (reflexes) · projects folder skeleton (order).
+# hooks + reminder (reflexes) · projects folder skeleton (order).
 # Idempotent: existing files are never overwritten without a timestamped
-# backup, existing vault notes are never touched.
+# backup, existing vault notes are never touched. Upgrading from v1.0: the two
+# old prompt reminders are unregistered and renamed to .bak (settings.remove.json).
 #
 # Usage:
 #   bash scripts/install.sh [--lang tr|en] [--vault DIR] [--projects DIR]
@@ -31,7 +32,7 @@ while [ $# -gt 0 ]; do
     --claude-home) CLAUDE_HOME="$2"; shift 2 ;;
     --name)        USER_NAME="$2"; shift 2 ;;
     --dry-run)     DRY=1; shift ;;
-    -h|--help)     sed -n '2,16p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 1 ;;
   esac
 done
@@ -47,16 +48,14 @@ if [ "$LANG_MODE" = "tr" ]; then
   [ -n "$PROJECTS_DIR" ] || PROJECTS_DIR="$HOME/Desktop/00-Projeler"
   TPL_VAULT="$REPO_DIR/templates/vault"
   TPL_CLAUDE="$REPO_DIR/templates/CLAUDE.md"
-  REM_B="$REPO_DIR/templates/reminders/behavior-check-reminder.json"
-  REM_S="$REPO_DIR/templates/reminders/skill-check-reminder.json"
+  REMINDER="$REPO_DIR/templates/reminders/session-reminder.json"
   SUBDIRS="Aktif Arsiv _araclar _yedekler"
 else
   [ -n "$VAULT_DIR" ]    || VAULT_DIR="$HOME/Documents/ClaudeVault"
   [ -n "$PROJECTS_DIR" ] || PROJECTS_DIR="$HOME/Desktop/00-Projects"
   TPL_VAULT="$REPO_DIR/templates/vault-en"
   TPL_CLAUDE="$REPO_DIR/templates/CLAUDE.en.md"
-  REM_B="$REPO_DIR/templates/reminders/behavior-check-reminder.en.json"
-  REM_S="$REPO_DIR/templates/reminders/skill-check-reminder.en.json"
+  REMINDER="$REPO_DIR/templates/reminders/session-reminder.en.json"
   SUBDIRS="Active Archive _tools _backups"
 fi
 
@@ -93,14 +92,31 @@ say ""
 # ------------------------------------------------------------------ 1. vault
 say "[1/6] vault"
 run "mkdir -p '$VAULT_DIR'"
+# Templates whose text changed in v1.1: an existing copy is still kept; if it still carries
+# the v1.0 text (marker below) it is listed at the end so the user can compare by hand.
+v10_marker() {
+  case "$1" in
+    MEMORY.md) echo 'K4 skill görünür|K4 skills visible' ;;
+    feedback_5_kanonik_davranis_kurali.md|feedback_5_canonical_rules.md) echo 'Self-test' ;;
+    reference_skill_routing.md) echo 'TIER 1' ;;
+  esac
+}
+KEPT_CHANGED=""
+NEW_NOTES=""
 for src in "$TPL_VAULT"/*.md "$TPL_VAULT"/*/README.md; do
   [ -e "$src" ] || continue
   rel="${src#$TPL_VAULT/}"
   dst="$VAULT_DIR/$rel"
-  if [ -e "$dst" ]; then say "  keep   : $rel (exists)"; continue; fi
+  if [ -e "$dst" ]; then
+    say "  keep   : $rel (exists)"
+    m="$(v10_marker "$rel")"
+    [ -n "$m" ] && grep -qE "$m" "$dst" && KEPT_CHANGED="$KEPT_CHANGED $rel"
+    continue
+  fi
   run "mkdir -p '$(dirname "$dst")' && cp '$src' '$dst'"
   fill "$dst"
   say "  create : $rel"
+  NEW_NOTES="$NEW_NOTES $rel"
 done
 
 # --------------------------------------------------------- 2. projects folder
@@ -134,12 +150,9 @@ CONF
 fi
 say "  write  : vault.conf"
 
-for pair in "$REM_B:behavior-check-reminder.json" "$REM_S:skill-check-reminder.json"; do
-  src="${pair%%:*}"; name="${pair##*:}"
-  backup_if_exists "$CLAUDE_HOME/$name"
-  run "cp '$src' '$CLAUDE_HOME/$name'"
-  say "  install: $name"
-done
+backup_if_exists "$CLAUDE_HOME/session-reminder.json"
+run "cp '$REMINDER' '$CLAUDE_HOME/session-reminder.json'"
+say "  install: session-reminder.json"
 
 # --------------------------------------------------------------- 4. CLAUDE.md
 say "[4/6] CLAUDE.md"
@@ -147,7 +160,8 @@ if [ -e "$CLAUDE_HOME/CLAUDE.md" ]; then
   run "cp '$TPL_CLAUDE' '$CLAUDE_HOME/CLAUDE.saltay.md'"
   fill "$CLAUDE_HOME/CLAUDE.saltay.md"
   say "  exists : $CLAUDE_HOME/CLAUDE.md — NOT touched."
-  say "  written: $CLAUDE_HOME/CLAUDE.saltay.md → merge the sections you want by hand."
+  say "  written: $CLAUDE_HOME/CLAUDE.saltay.md → merge the sections you want by hand"
+  say "           (upgrading from v1.0? CHANGELOG.md lists what changed in the core)."
 else
   run "cp '$TPL_CLAUDE' '$CLAUDE_HOME/CLAUDE.md'"
   fill "$CLAUDE_HOME/CLAUDE.md"
@@ -157,7 +171,9 @@ fi
 # ----------------------------------------------------------- 5. settings.json
 say "[5/6] settings.json hooks"
 HOOKS_TMP="$(mktemp)"
+REMOVE_TMP="$(mktemp)"
 sed "s|__CLAUDE_HOME__|$CLAUDE_HOME|g" "$REPO_DIR/hooks/settings.hooks.json" > "$HOOKS_TMP"
+sed "s|__CLAUDE_HOME__|$CLAUDE_HOME|g" "$REPO_DIR/hooks/settings.remove.json" > "$REMOVE_TMP"
 SETTINGS="$CLAUDE_HOME/settings.json"
 if [ "$DRY" -eq 1 ]; then
   say "  [dry-run] would merge hooks into $SETTINGS"
@@ -172,18 +188,33 @@ elif [ ! -e "$SETTINGS" ]; then
 else
   backup_if_exists "$SETTINGS"
   if command -v node >/dev/null 2>&1; then
-    node "$REPO_DIR/scripts/merge-settings.js" "$SETTINGS" "$HOOKS_TMP"
+    node "$REPO_DIR/scripts/merge-settings.js" "$SETTINGS" "$HOOKS_TMP" "$REMOVE_TMP"
     say "  merged : $SETTINGS (node)"
   elif python3 -c 'import sys' >/dev/null 2>&1; then   # (Windows Store stub fails this test)
-    python3 "$REPO_DIR/scripts/merge-settings.py" "$SETTINGS" "$HOOKS_TMP"
+    python3 "$REPO_DIR/scripts/merge-settings.py" "$SETTINGS" "$HOOKS_TMP" "$REMOVE_TMP"
     say "  merged : $SETTINGS (python3)"
   else
     cp "$HOOKS_TMP" "$CLAUDE_HOME/settings.saltay.json"
     say "  !! neither node nor python3 found — hook block written to"
-    say "     $CLAUDE_HOME/settings.saltay.json — merge it into settings.json by hand."
+    say "     $CLAUDE_HOME/settings.saltay.json — merge it into settings.json by hand,"
+    say "     and remove these old commands if they are there:"
+    grep -o '"cat [^"]*"' "$REMOVE_TMP" | sed 's/^/       /'
   fi
 fi
-rm -f "$HOOKS_TMP"
+rm -f "$HOOKS_TMP" "$REMOVE_TMP"
+
+# v1.0 → v1.1: the two old prompt reminders are retired once nothing references them.
+for old in behavior-check-reminder.json skill-check-reminder.json; do
+  [ -e "$CLAUDE_HOME/$old" ] || continue
+  if [ "$DRY" -eq 1 ]; then
+    say "  [dry-run] would retire $old → $old.$TS.bak once settings.json no longer references it"
+  elif [ -e "$SETTINGS" ] && grep -q "$old" "$SETTINGS"; then
+    say "  keep   : $old (still referenced in settings.json)"
+  else
+    mv "$CLAUDE_HOME/$old" "$CLAUDE_HOME/$old.$TS.bak"
+    say "  retire : $old → $old.$TS.bak (replaced by session-reminder.json)"
+  fi
+done
 
 # ----------------------------------------------------------------- 6. verify
 say "[6/6] verify"
@@ -206,4 +237,11 @@ else
   say "  2. Obsidian → Open folder as vault → $VAULT_DIR"
   say "  3. Fill $VAULT_DIR/user_profile.md (or tell Claude in the first session, it writes it)."
   say "  4. Health check: bash scripts/vault-health.sh"
+fi
+
+if [ -n "$KEPT_CHANGED" ]; then
+  say ""
+  say "upgrade note: these vault files still carry the v1.0 text; yours were kept (never overwritten):"
+  for f in $KEPT_CHANGED; do say "  - $f   new version: $TPL_VAULT/$f"; done
+  say "  compare them by hand; add a MEMORY.md line for each note created this run:${NEW_NOTES:- none}"
 fi

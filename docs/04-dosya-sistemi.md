@@ -34,6 +34,30 @@ projelerin dışında kalır.
 Claude bu döngüyü anayasadaki hafıza protokolü gereği **kendisi yürütür**: yeni müşteri geldiğinde
 notu açar, iş bitince arşivler. Script'ler elle kısayoldur, zorunluluk değil.
 
+## Teslim klasörü (v1.1)
+
+Kod proje klasöründe yaşar; **teslim** (ses, video, görsel, PDF, belge) kullanıcının gördüğü tek bir
+klasöre konur. Yazarın vakasında beş kez aynı şikâyet geldi: dosya proje klasörünün içinde bırakılmış,
+"sohbete gönderdim" denmişti; bir seferinde de hızlıca istenen kısa bir metin, uzun bir turun ortasında
+ara metin olarak kalıp hiç görülmemişti ([10-dersler](10-dersler.md) #30).
+
+```
+<teslim klasörü>/
+└── <Proje Adı>/
+    ├── 01 - <İçeriği söyleyen ad>.pdf
+    ├── 01 - <İçeriği söyleyen ad>.html     ← belge HTML'se PDF'i yanında
+    └── 02 - <İçeriği söyleyen ad>.mp4
+```
+
+- Klasör ve dosya adları okunur: boşluklu, numaralı, içeriği söyleyen (`01 - Ana Sayfa Metni.pdf`);
+  hepsine aynı adı (`01 - Reels.mp4`) vermek de kural ihlalidir, telefona tek tek gidince hangisi ne
+  belli olmaz.
+- Mesajda tam yol yazılır. Sohbete göndermek, galeride açmak ya da turun ortasında yazmak bunun yerine geçmez.
+- Okunacak ya da birine gönderilecek belge HTML üretildiyse yanına aynı adla PDF konur: HTML telefonda
+  ve mesajlaşmada açılmaz. Baskı CSS'inde gölge ve saydamlık kullanılmaz (#31).
+- Teslim klasörü proje kökünden ayrı bir yerde durur (yazarda masaüstü ya da ikinci bir disk); proje
+  klasörü kodun, teslim klasörü kullanıcının.
+
 ## Geri-dönülebilir taşıma (silme yerine)
 
 Temizlik, curate, "şunu kaldır" işlerinde varsayılan **silmek değil taşımaktır**:

@@ -22,9 +22,21 @@ Arşiv zamanı: kapanmış `not_` + 3 aydır dokunulmamış `proje_` → `arsiv/
 Taşıma öncesi her adayın `description`'ını oku. Sonra `bash ~/.claude/hooks/vault-index.sh | wc -c`.
 
 ### "Claude sürekli izin soruyor."
-K2. Kontrol: `behavior-check-reminder.json` her prompt'ta geliyor mu (`settings.json`
-`UserPromptSubmit`)? Claude Code izin modu bypass mı? Sonra vault'a `feedback_` notu: hangi soruyu
-sordu, sen ne dedin. İki tekrar = kural.
+K2. Kontrol: `session-reminder.json` her prompt'ta geliyor mu (`settings.json` → `UserPromptSubmit`)?
+Claude Code izin modu ne? Yüklü bir output style ya da eklenti "karar noktasında dur, kullanıcıya
+sor" diyor olabilir: anayasayla çelişen yük kuralı sessizce ezer ([10-dersler](10-dersler.md) #23).
+Sonra vault'a `feedback_` notu: hangi soruyu sordu, sen ne dedin. İki tekrar = kural.
+
+### "v1.0 kurdum, nasıl yükseltirim?"
+```bash
+git pull
+bash scripts/install.sh --lang tr
+```
+Kurulum `settings.json`'daki iki eski hatırlatıcıyı çıkarır, yenisini ekler, eski iki dosyayı
+`.<tarih>.bak` yapar. `CLAUDE.md`'ne ve vault notlarına dokunmaz: yeni anayasa `CLAUDE.saltay.md`'ye
+yazılır, yeni üç vault şablonu eklenir. Vault'unda hâlâ v1.0 metni duran şablonlar (5 kanonik kural,
+skill routing, `MEMORY.md`) kurulumun sonunda listelenir; onları `templates/vault/` ile elle
+karşılaştır. Farklar: [CHANGELOG](../CHANGELOG.md).
 
 ### "Claude işi genişletiyor / istemediğim refactor yapıyor."
 K5. Görevin fiil + nesnesini kendin de net yaz: "sadece hero bölümünü, başka bir şeye dokunma".
@@ -43,7 +55,8 @@ başına farklıysa `{{VAULT_DIR}}` satırını elle düzelt.
 
 ### "Zaten bir CLAUDE.md'm var."
 `install.sh` dokunmaz; `~/.claude/CLAUDE.saltay.md` yazar. Önce **Hafıza Protokolü** bölümünü al
-(zorunlu), sonra 5 kural + trafik ışığı, gerisi isteğe bağlı.
+(zorunlu), sonra K0-K5 + trafik ışığı, gerisi isteğe bağlı. Birleştirirken boyuta dikkat: anayasa her
+oturumda yüklenir; ≤ 12 KB hedef, `vault-health.sh` 15 KB'ı geçince uyarır.
 
 ### "Türkçe mi İngilizce mi?"
 Kurulumda `--lang tr|en`. Prefix seti ve index etiketleri dile göre gelir (`proje_`/`not_` ↔
@@ -63,14 +76,24 @@ otomatik önceler.
 Anayasa "kullanma" der; yine de oluşursa `templates/auto-memory-redirect.md` içeriğini oradaki
 `MEMORY.md`'ye koy. Tek kaynak vault.
 
-### "Skill'ler çalışıyor mu, nasıl anlarım?"
-Claude her görev başında tier kararını **söylemek** zorunda ("frontend-design çağırıyorum çünkü…" /
-"senior-backend atlıyorum çünkü generic"). Söylemiyorsa `skill-check-reminder.json` yüklü mü bak;
-yüklüyse `feedback_` notu.
+### "Claude skill'lerimi kullanmıyor."
+v1.1'de bilinçli: skill varsayılan değil. Claude yalnız kendisinde olmayan, işe ya da sürüme özgü bilgi
+veren bir skill'i (dosya üretimi, sürüme özgü API, senin yazdığın bir hat) çağırır ve bunu tek cümleyle
+söyler; atladığını anlatmaz. Belirli bir iş için bir skill'in kullanılmasını istiyorsan bunu
+`reference_skill_routing` notuna yaz ya da görevde söyle. Bir skill çıktıyı kötüleştirdiyse adını aynı
+nota "çağırma" tarafına yaz. Arka plan: [06-skill-agent-mcp](06-skill-agent-mcp.md).
 
 ### "Subagent kullanmak istiyorum."
-Anayasada varsayılan kapalı; açıkça iste. Claude süreyi önden söylemeli ve kapsamı bölmeli.
-Sessizlik toleransın yüksekse `CLAUDE.md`'deki anti-pattern satırını yumuşat — bu senin kalibrasyonun.
+Serbest, ama takılmak yasak. Büyük ve bağımsız işte (birbirinden bağımsız modüller, salt-okuma paralel
+kontroller) Claude ajan açabilir: süre sınırı koyar, tahmini süreyi baştan söyler, dönen sonucu
+doğrular. Araştırma ve soru-cevapta ajan açmaz; paralel aramayla kısa turlar yürütür. Sessizlik
+toleransın yüksekse `CLAUDE.md`'deki 🤖 satırını gevşet: bu senin kalibrasyonun.
+
+### "Claude dondu mu? Sayaç dönüyor, ekranda tek satır yok."
+Büyük ihtimalle bir `Agent` çağrısı sürüyor. `Agent` mesajı bloklar: aynı mesajdaki her işin sonucu en
+yavaş ajan bitince gelir, o sürede model sana tek satır yazamaz. Durdurup "ajansız, paralel aramayla
+devam et" de; olayı vault'a `feedback_` notu olarak yazdır. Anayasadaki 🤖 satırı bunun için var
+([10-dersler](10-dersler.md) #26).
 
 ### "Hook'lar macOS'ta çalışır mı?"
 Evet; bash + awk + sed yeter. `LC_ALL=C.UTF-8` yoksa script `en_US.UTF-8`'e düşer. BSD awk eski

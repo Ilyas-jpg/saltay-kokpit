@@ -4,7 +4,11 @@
 
 ## Üretilen kodda tartışmasız asgari
 
-Anayasadaki liste; kısaca:
+v1.0'da bu liste anayasanın içindeydi. v1.1'de anayasada üç satır kaldı: sır depoya ve log'a girmez;
+doğrulama ve yetki sunucuda, uçlarda hız sınırı; deploy öncesi `audit` HIGH/CRITICAL çözülür. Sebep:
+güçlü model aşağıdaki standartları zaten uyguluyor; her oturumda listeyi yeniden yüklemek bedel, değer
+değil. Yazarın kararı: *"zaten güvenli iş yapıyorsun, bir de ekstradan kontrol ederiz."* Liste referans
+olarak burada durur; denetimde, kod incelemesinde ve "neden böyle?" sorusunda açılır.
 
 - Parameterized query · bcrypt/argon2 · CORS whitelist · rate limit (login/signup/form/API) ·
   production'da stack trace yok · `.env` commit edilmez (`.env.example` var) · HTTPS + güvenlik

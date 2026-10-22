@@ -18,6 +18,12 @@ kurulur, mevcut ayarlarına dokunmaz.
 Adını yazarın soyadından ve pilot kabininden alır. Kokpit, göstergelerin, otomatik pilotun ve
 kırmızı düğmelerin olduğu yerdir: uçuşu Claude yapar, rotayı ve sınırları sen belirlersin.
 
+> **v1.1 (2026-10-22):** yedi haftalık gerçek kullanımın ardından. Anayasa "belge değil yükleme
+> politikası" ilkesiyle ~11 KB'a indi; her prompt'taki iki uzun hatırlatma (1,7 KB) tek kısa
+> hatırlatmaya (~500 B); skill kuralı "varsayılan değil", subagent kuralı "serbest, takılmak yasak"
+> oldu; üç yeni vault şablonu ve 17 yeni ders geldi. v1.0'dan yükseltme tek komut
+> ([aşağıda](#v10dan-yükseltme)); tüm farklar [CHANGELOG](CHANGELOG.md)'da.
+
 ---
 
 ## İçindekiler
@@ -39,16 +45,17 @@ kırmızı düğmelerin olduğu yerdir: uçuşu Claude yapar, rotayı ve sınır
 
 Claude Code varsayılan olarak **her oturumu sıfırdan** başlatır. Sen kimsin, hangi projeler var,
 hangi sunucuya nasıl girilir, dün ne kararlaştırıldı, geçen hafta "bunu bir daha yapma" dediğin
-şey: hepsi gider. Bu depo, altı ay boyunca tek bir bilgisayarda, yüzden fazla gerçek projede
+şey: hepsi gider. Bu depo, yedi ay boyunca tek bir bilgisayarda, yüzden fazla gerçek projede
 (kurumsal siteler, yönetim panelleri, botlar, video hattı, afet araçları) o sıfırlamayı kırmak için
 kurulan sistemin **kişisel ve müşteri verisi ayıklanmış** halidir.
 
-| Sayılarla | |
-|---|---|
-| Vault notu | 375 |
-| Davranış kuralı (`feedback_`) | 128 |
-| Proje notu | 89 |
-| Belgelenmiş "gerçek hata → kural" dersi | 21 |
+| Sayılarla | v1.0 (eylül) | v1.1 (ekim) |
+|---|---|---|
+| Vault notu | 375 | 534 (+43 arşivde) |
+| Davranış kuralı (`feedback_`) | 128 | 188 |
+| Proje notu | 89 | 124 |
+| Belgelenmiş "gerçek hata → kural" dersi | 21 | 38 |
+| Anayasa (`CLAUDE.md`, her oturumda yüklenir) | 24 KB | 11-14 KB |
 
 Teori değil: her kuralın arkasında tarihli bir olay var ([docs/10-dersler.md](docs/10-dersler.md)).
 
@@ -85,7 +92,7 @@ flowchart TB
     end
     subgraph H["⚙️ REFLEKSLER — hooks (bash)"]
         direction LR
-        h1["SessionStart: index enjekte (≤ 9,5 KB)"] --- h2["PreToolUse: yedek"] --- h3["PostToolUse: sır tarama · log"] --- h4["UserPromptSubmit: kural hatırlat"]
+        h1["SessionStart: index enjekte (≤ 9,5 KB)"] --- h2["PreToolUse: yedek"] --- h3["PostToolUse: sır tarama · log"] --- h4["UserPromptSubmit: kısa hatırlatma"]
     end
     subgraph F["🗂️ DÜZEN — dosya sistemi"]
         direction LR
@@ -101,15 +108,15 @@ flowchart TB
 | Katman | Ne yapar | Nerede |
 |---|---|---|
 | **Hafıza** | Düz `.md` notlar, prefix'li, frontmatter'lı. Index'i her oturuma **koşulsuz** gelir; kendini ölçer, 10K sınırına asla ulaşmaz. | `templates/vault/` → `~/Documents/ClaudeVault` |
-| **Anayasa** | Davranış çekirdeği: hafıza protokolü, 5 kanonik kural, trafik ışığı, skill refleksi, güvenlik, anti-pattern listesi. Bilgi değil, davranış. | `templates/CLAUDE.md` → `~/.claude/CLAUDE.md` |
+| **Anayasa** | Davranış çekirdeği: hafıza protokolü, 5 kanonik kural, trafik ışığı, üç satırlık güvenlik, kurulum ilkeleri, anti-pattern listesi. Bilgi değil, davranış; envanter ve tarihçe vault'ta. | `templates/CLAUDE.md` → `~/.claude/CLAUDE.md` |
 | **Refleksler** | Modelin iradesine bırakılmayan işler: index yükle, düzenlemeden önce yedekle, sır tara, kuralı hatırlat. | `hooks/` → `~/.claude/hooks/` + `settings.json` |
 | **Düzen** | Aktif/arşiv klasörleri, geri-dönülebilir silme, devir belgeleri; proje aç/kapat script'leri. | `scripts/` |
 
 ## Bir oturum nasıl akar
 
-1. Oturum açılır. Hook, vault index'ini basar: *"375 not · çekirdek: profil, 5 kural, skill routing · feedback: … · proje: …"*
+1. Oturum açılır. Hook, vault index'ini basar: *"534 not · çekirdek: profil, 5 kural, skill routing · feedback: … · proje: …"*
 2. Sen: *"örnek-site'nin hero'sunu canlıya al."*
-3. Hook her prompt'ta 5 kuralı ve skill tier kontrolünü hatırlatır.
+3. Hook her prompt'a kısa bir hatırlatma ekler: vault'a bak ve yaz, brief'in sonunu tut, kırmızı dışında izin sorma.
 4. Model index'te `proje_ornek_site` ve `HANDOFF_ornek_site` görür, **okumadan cevap vermez**: deploy komutu, yedek yolu, "bir daha yapma" listesi oradadır.
 5. Deploy öncesi riski simüle eder (ana sayfa, apex domain, dil değişimi). Düzenlediği her dosyadan önce `.backups/`'a kopya düşer.
 6. Canlıda doğrular, kanıt gösterir; "yükledim, oldu" demez.
@@ -141,7 +148,7 @@ istersen `--dry-run`.
 |---|---|
 | Vault şablonları | `~/Documents/ClaudeVault/` (var olan notlara dokunmaz) |
 | Proje klasörü iskeleti | `~/Desktop/00-Projeler/{Aktif,Arsiv,_araclar,_yedekler}` |
-| Hook'lar, `vault.conf`, hatırlatıcılar | `~/.claude/hooks/`, `~/.claude/vault.conf`, `~/.claude/*-reminder.json` |
+| Hook'lar, `vault.conf`, hatırlatıcı | `~/.claude/hooks/`, `~/.claude/vault.conf`, `~/.claude/session-reminder.json` |
 | Anayasa | `~/.claude/CLAUDE.md`; **varsa dokunmaz**, yanına `CLAUDE.saltay.md` yazar |
 | Hook kaydı | `~/.claude/settings.json`'a birleştirir (yedek alır, aynı komutu iki kez eklemez) |
 | Doğrulama | index boyutu ve stdin JSON testi |
@@ -164,6 +171,18 @@ bash scripts/new-project.sh "Müşteri Sitesi" --desc "Kurumsal site + teklif fo
 bash scripts/archive-project.sh "Müşteri Sitesi" --reason "teslim edildi"
 ```
 
+### v1.0'dan yükseltme
+
+```bash
+git pull
+bash scripts/install.sh --lang tr
+```
+
+Kurulum `settings.json`'daki iki eski hatırlatıcıyı birebir komut eşleşmesiyle çıkarır, yenisini
+ekler, eski iki dosyayı `.<tarih>.bak` yapar; başka hook'una dokunmaz. `CLAUDE.md`'n ve vault notların
+ezilmez: yeni anayasa `CLAUDE.saltay.md`'ye yazılır, üç yeni vault şablonu eklenir, vault'unda hâlâ
+v1.0 metni duran şablonlar kurulumun sonunda listelenir (elle karşılaştır).
+
 ## Depo yapısı
 
 ```
@@ -172,18 +191,19 @@ saltay-kokpit/
 ├── docs/
 │   ├── 01-neden.md              sorun, felsefe, dört katman, bir oturumun akışı
 │   ├── 02-hafiza-vault.md       prefix sistemi, iki index, 10K sınırı, sıkışma seviyeleri, arşiv
-│   ├── 03-anayasa.md            CLAUDE.md bölümleri, 5 kural, trafik ışığı, bakım
-│   ├── 04-dosya-sistemi.md      Aktif/Arşiv, geri-dönülebilir taşıma, yedek katmanları, HANDOFF
-│   ├── 05-hooklar.md            her hook'un nedeni, kendini ölçen index, "tetikleniyor ≠ çalışıyor"
-│   ├── 06-skill-agent-mcp.md    tier sistemi, signal vs noise, subagent, MCP denetimi
+│   ├── 03-anayasa.md            yükleme politikası, bölümler, K0-K5, trafik ışığı, bakım
+│   ├── 04-dosya-sistemi.md      Aktif/Arşiv, teslim klasörü, geri-dönülebilir taşıma, yedek, HANDOFF
+│   ├── 05-hooklar.md            her hook'un nedeni, kendini ölçen index, tek kısa hatırlatma
+│   ├── 06-skill-agent-mcp.md    skill varsayılan değil, subagent, MCP, oturum başı yük
 │   ├── 07-guvenlik-ve-yayin.md  kod güvenliği asgarisi, log silme yasağı, GitHub hijyeni
-│   ├── 08-windows.md            iki kabuk, UTF-8, backtick tuzağı, yollar
-│   ├── 09-sss.md                sorun giderme
-│   └── 10-dersler.md            21 gerçek olay → kural
+│   ├── 08-windows.md            iki kabuk, UTF-8, Bash tool tuzakları, Python, ASCII dışı yollar
+│   ├── 09-sss.md                sorun giderme, v1.0'dan yükseltme
+│   └── 10-dersler.md            38 gerçek olay → kural
 ├── templates/
 │   ├── CLAUDE.md · CLAUDE.en.md            anayasa (yer tutucular kurulumda dolar)
-│   ├── vault/ · vault-en/                  vault iskeleti: README, MEMORY, profil, 5 kural, şablonlar, arşiv
-│   ├── reminders/                          UserPromptSubmit hatırlatıcıları (tr/en)
+│   ├── vault/ · vault-en/                  vault iskeleti: README, MEMORY, profil, 5 kural, skill routing,
+│   │                                       doğrulama yüzeyi, kurulum envanteri, anayasa tarihçesi, şablonlar, arşiv
+│   ├── reminders/                          UserPromptSubmit hatırlatıcısı (tr/en, ~500 B)
 │   ├── project/.gitignore                  AI dosyalarını dışlayan proje .gitignore'u
 │   ├── project/launch.json.example         Browser pane dev sunucu kaydı
 │   └── auto-memory-redirect.md             Claude Code'un kendi hafıza dizini için yönlendirme
@@ -191,6 +211,7 @@ saltay-kokpit/
 │   ├── vault-index.sh           SessionStart: kendini ölçen index (seviye 0-5 + failsafe)
 │   ├── hook-meta.sh             stdin JSON → tool_name|file_path
 │   ├── settings.hooks.json      settings.json'a birleştirilecek blok
+│   ├── settings.remove.json     eski sürümün komutları (yükseltmede kaldırılır)
 │   └── README.md                hook tablosu + isteğe bağlı hook'lar
 ├── scripts/
 │   ├── install.sh · install.ps1 kurulum (idempotent)
@@ -203,35 +224,42 @@ saltay-kokpit/
 
 ## Omurga: kurallar ve refleksler
 
-**5 kanonik davranış kuralı** (her prompt'ta hatırlatılır; ayrıntı [docs/03-anayasa.md](docs/03-anayasa.md)):
+**5 kanonik davranış kuralı** (anayasada kural başına tek satır; ayrıntı [docs/03-anayasa.md](docs/03-anayasa.md)):
 
 | | Kural | Tek cümle |
 |---|---|---|
-| K0 | Son 5 mesajı tara | Oturum-içi yasaklar ve brief'in son paragrafı kaybolmaz |
+| K0 | Brief'in sonu | Brief'in son paragrafı ve oturum içi yasaklar kaybolmaz |
 | K1 | Literal yorum | "Sıfırdan" = %100, "denesene" = test, "kullanma" = yasak |
-| K2 | Otonom devam | İzin sorma; gerçek tercih (A/B/C) ve 🔴 risk sorulabilir |
-| K3 | Riski sıkı değerlendir | Silme/deploy öncesi vault grep + kullanıcı yolunu simüle et |
-| K4 | Skill görünür | Tier 1 çağır / Tier 3 atla; kararı söyle |
-| K5 | Scope dar | Fiil + nesne; "daha iyi olur" ile genişletme yok |
+| K2 | Otonom devam | İzin sorma; gerçek tercih (A/B/C) ve 🔴 risk sorulabilir; yapabildiğin işi kullanıcıya atma |
+| K3 | Riski sıkı değerlendir | Silme/deploy öncesi vault grep + kullanıcı yolunu simüle et; bu bilgisayardaki tarayıcıyı sür |
+| K4 | Skill varsayılan değil | Sende olmayan, işe/sürüme özgü bilgi veriyorsa çağır; genel öğütse çağırma |
+| K5 | Scope dar | Fiil + nesne; "daha iyi olur" ile genişletme yok; yan konuyu sessizce ölç, sonda raporla |
 
-**Trafik ışığı:** 🟢 düzenle, oku, test et: sorma · 🟡 refactor, DNS, şema: yap, raporla · 🔴 para,
-geri alınamaz silme, yasal, public yayın, domain: dur, sor. "Tam yetki sende" kırmızıyı kaldırmaz.
+**Trafik ışığı:** 🟢 düzenle, oku, test et, kendi sitene doğrulanmış deploy: sorma · 🟡 refactor, DNS,
+şema: yap, raporla · 🔴 para, geri alınamaz silme, yasal, müşterinin canlı sitesi, public yayın,
+domain: dur, sor. "Tam yetki sende" kırmızıyı kaldırmaz.
+
+**Subagent:** serbest, takılmak yasak. `Agent` çağrısı mesajı bloklar; araştırmada ajan yok, tek
+mesajda 5-8 paralel arama; büyük işte süre sınırı ve tahmini süre.
 
 **Vault prefix'leri:** `kullanici_` `kisisel_` `feedback_` `reference_` `proje_` `HANDOFF_` `not_`.
 Hook adları prefix'e göre bölümler; `feedback_` adları hiçbir sıkışma seviyesinde kırpılmaz.
 
-**Hook'lar:** `SessionStart` index · `UserPromptSubmit` kural hatırlatma · `PreToolUse` yedek ·
+**Hook'lar:** `SessionStart` index · `UserPromptSubmit` kısa hatırlatma (~500 B) · `PreToolUse` yedek ·
 `PostToolUse` sır tarama + değişiklik logu.
 
 ## Gerçek hatalardan çıkan dersler
 
-Beş örnek; 21'inin tamamı [docs/10-dersler.md](docs/10-dersler.md)'de.
+Altı örnek; 38'inin tamamı [docs/10-dersler.md](docs/10-dersler.md)'de.
 
 1. **Koşullu hafıza talimatı** üç ay boyunca "bazen unutuyor" üretti. Kural: hafıza koşulsuz yüklenir.
 2. **Hook çıktısı 10K'yı aşınca** Claude index'in %85'ini görmüyordu. Kural: index kendini ölçer, kademeli sıkışır.
 3. **Hook değişkeni bir sürümde boş geldi**, yedekler iki hafta sessizce alınmadı. Kural: stdin JSON + fiili test.
-4. **Altı paralel subagent** işi doğru yaptı ama 1,4 milyon token ve 75 dakika sessizlik üretti. Kural: varsayılan kapalı.
-5. **`journalctl --vacuum`** on günlük saldırı logunu sildi. Kural: log hiç silinmez.
+4. **Altı paralel subagent** 75 dakika sessizlik üretti, yasaklandı; iki ay sonra yasak kalktı, araştırma
+   ajanları yine 56-60 dakika sustu. `Agent` çağrısı mesajı bloklar. Kural: araştırmada ajan yok, paralel arama.
+5. **Her prompt'a eklenen hatırlatma** aynı kuralların dördüncü kopyasıydı; 24 KB'lık anayasanın yarısı
+   envanterdi. Kural: anayasa yükleme politikasıdır, belge değil.
+6. **`journalctl --vacuum`** on günlük saldırı logunu sildi. Kural: log hiç silinmez.
 
 ## Sözlük
 
@@ -243,7 +271,8 @@ Beş örnek; 21'inin tamamı [docs/10-dersler.md](docs/10-dersler.md)'de.
 | **Kanonik kural** | Tekrarlanan düzeltmelerin damıtıldığı 5 (+1) meta-kural. |
 | **Feedback notu** | Bir düzeltmenin üç parçası: Kural + Why + How to apply. Bağlayıcıdır. |
 | **HANDOFF** | Bir projenin operasyonel devir belgesi: durum, runbook, deploy, "bir daha yapma". |
-| **Tier** | Skill'in değer sınıfı: 1 çağır, 2 durumla, 3 atla. Karar her zaman söylenir. |
+| **Skill kararı** | Tek soru: bu skill bende olmayan, işe ya da sürüme özgü bir bilgi veriyor mu? Evetse çağır, hayırsa çağırma. |
+| **Yükleme politikası** | Her oturumda yüklenen şeyin (anayasa, hatırlatma, plugin, agent tanımı) yalnız her oturumda geçerli çekirdeği taşıması. |
 | **Geri-dönülebilir taşıma** | Silmek yerine `.curation-trash-<tarih>/`'e taşımak; manifest + geri alma komutu. |
 | **Sıkışma seviyesi** | Index'in bütçeye sığmak için uyguladığı kademe (0-5). Seviye ≥4 = arşivleme zamanı. |
 
@@ -253,14 +282,16 @@ Beş örnek; 21'inin tamamı [docs/10-dersler.md](docs/10-dersler.md)'de.
   ekle. Sistem *senin* hatalarından öğrenmeye başladığında işe yarar.
 - **Kök dağılır.** Altı ay sonra proje kökünde 399 öğe vardı. Arşiv protokolü ve geri-dönülebilir
   taşıma tam bu yüzden var; ara sıra temizlik oturumu gerekir.
+- **Kurallar da şişer.** Yazarın anayasası 24 KB'tan 10,9 KB'a indirildi, üç haftada 13,6 KB'a geri
+  çıktı; index'i bugün sıkışma seviyesi 4'te. Her yeni model neslinde yeniden ölçmek gerekir.
 - **Hook'lar bash.** Windows'ta Git Bash şart. PowerShell'e çevirme, bozulur.
 - **10K sınırı sürüme bağlı** (Claude Code ≥ 2.1.88'de görüldü). Script eski sürümlerde de zararsızdır.
 - **Vault kişiseldir.** Public repoya asla; senkron ya da private yedek, credential dışarıda.
 - **Dokümanlar şimdilik Türkçe.** README'nin İngilizcesi sistemi eksiksiz anlatır; doküman çevirisi
   katkıya açık.
 - Bu depo, sistemin kendisi kullanılarak Claude Code ile birlikte hazırlandı; script'ler sanal bir
-  HOME'da uçtan uca test edildi (TR temiz kurulum, EN mevcut ayarlara birleştirme, proje aç/arşivle,
-  sağlık kontrolü).
+  HOME'da uçtan uca test edildi (TR temiz kurulum, EN mevcut ayarlara birleştirme, v1.0'dan yükseltme,
+  tekrar çalıştırma, proje aç/arşivle, sağlık kontrolü).
 
 ## Yol haritası
 

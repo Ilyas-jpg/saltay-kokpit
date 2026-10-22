@@ -1,14 +1,15 @@
 # 05 · Hook'lar — modelin iradesine bırakılmayan davranışlar
 
 Hook, Claude Code'un belirli olaylarda çalıştırdığı kabuk komutudur. Model bir şeyi yapmayı
-unutabilir; hook unutmaz. Bu sistemde beş hook var, hepsi **bash** (Windows'ta Git Bash).
+unutabilir; hook unutmaz. Bu sistemde beş hook var, hepsi **bash** (Windows'ta Git Bash). Hook'un
+çıktısı da her oturumda ya da her prompt'ta bağlama girer; bu yüzden kısa tutulur.
 
 ## Hook tablosu
 
 | Olay | Eşleşme | Ne yapar | Neden |
 |---|---|---|---|
 | `SessionStart` | — | `vault-index.sh`: vault index'ini basar | Hafızanın **koşulsuz** yüklenmesi. Tek en önemli hook. |
-| `UserPromptSubmit` | — | `behavior-check-reminder.json` + `skill-check-reminder.json` içeriğini prompt'a ekler | 5 kural + skill tier her prompt'ta gelir. Uzun oturumda context sıkıştırılınca anayasa bile silikleşir; bu hatırlatma sıkıştırmayı atlatır. |
+| `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) prompt'a ekler | Hafıza protokolü, brief'in son paragrafı ve 🔴 dışında izin sorma: her prompt'ta gelir. Uzun oturumda context sıkıştırılınca anayasa bile silikleşir; bu hatırlatma sıkıştırmayı atlatır. |
 | `PreToolUse` | `Edit\|MultiEdit` | `./.backups/<ad>.<tarih>.bak` kopyası | Yeşil ışığın ("düzenle, sorma") dayanağı. |
 | `PostToolUse` | `Edit\|Write` | `password = "…"` kalıbında sabit sır arar, uyarır | Sır sızıntısı en ucuz burada yakalanır. |
 | `PostToolUse` | `Edit\|MultiEdit\|Write` | `~/.claude/changes.log`'a `[zaman] Araç yol` | Denetim izi; hook sağlığının da göstergesi. |
@@ -19,6 +20,21 @@ komutu ikinci kez eklemez).
 
 İsteğe bağlı iki hook (git auto-add, ilgili testleri koştur) `hooks/README.md`'de; herkes istemez
 diye varsayılan blokta yok.
+
+## Hatırlatma neden tek ve kısa (v1.1)
+
+v1.0'da her prompt'a iki dosya ekleniyordu: 5 kanonik kuralın uzun hali ve skill tier kontrolü,
+toplam 1,7 KB. Ölçülünce bunun aynı kuralların dördüncü kopyası olduğu görüldü: anayasada, vault
+notunda, hatırlatmada ve Claude Code'un kendi sistem promptunda. Güçlü model kısa talimatla yönlenir;
+uzun ve sert hatırlatma ise aşırı tetiklenme üretir (her cevaba bir "skill kontrolü" paragrafı).
+v1.1'de tek dosya kaldı, yalnız modelin kendiliğinden yapmadığı üç şeyi söyler: vault'a bak ve yaz,
+brief'in son paragrafını tut, kırmızı dışında izin sorma ([10-dersler](10-dersler.md) #22).
+
+**Yükseltme:** `install.sh` v1.0'ın kaydettiği iki komutu `hooks/settings.remove.json` listesine göre
+(birebir komut eşleşmesiyle) `settings.json`'dan çıkarır, yenisini ekler ve eski iki dosyayı
+`<ad>.<tarih>.bak` olarak yana alır. Başka hiçbir hook'a dokunmaz. Elle birleştiriyorsan aynı iki
+`cat …-reminder.json` satırını sen sil; ikisi birden kayıtlı kalırsa aynı kurallar her prompt'ta iki
+kez gelir, `vault-health.sh` bunu uyarır.
 
 ## `vault-index.sh` — kendini ölçen index
 

@@ -1,65 +1,55 @@
 ---
-name: Skill routing — tier-based decision guide
-description: When a task arrives, which skill to CALL / STOP AND THINK / SKIP. Value-based, not the defensive "call it if it exists". The decision is always visible to the user.
+name: Skill routing — when to call, when not to
+description: The table behind K4. A skill is not a default; call it only if it gives knowledge I don't have that is specific to the job or the version. General-advice skills are not called; if a skill's advice conflicts with a vault rule, the vault wins.
 type: reference
 priority: critical
 ---
 
-# Skill Routing — Tier Guide
+# Skill Routing
 
-> First question when a task arrives: *"Will I actually use this skill's output?"*
-> **Yes, I need specific knowledge** → Tier 1, CALL. **Maybe** → Tier 2, say the decision.
-> **No, it's already in training** → Tier 3, SKIP + say why.
-> Both directions are legitimate. **A silent call or a silent skip is forbidden.**
+> **One question:** *does this skill give me knowledge I don't have that is specific to the job or the version?*
+> Yes → call it, say so in one sentence. No → don't call it, don't narrate.
+>
+> **Changed in v1.1:** v1.0's "call the Tier 1 design skill, state the decision in every task" rule was
+> removed. Two reasons: (1) skills written for older models are prescriptive and pull a strong model into
+> a narrow mould; half of one design skill's advice was exactly the "AI tells" the author's vault bans;
+> (2) the "skill check: skipping because…" paragraph added noise to every answer.
 
-## TIER 1 — CALL IMMEDIATELY (the skill produces specific value)
+## Call (carries specific knowledge)
 
-| Task | Skill type | Why |
+| Job | Skill type | Why |
 |---|---|---|
-| Frontend design, pages, components | design / frontend-design skill | Brakes the model's drift into "AI aesthetic" defaults |
-| Word / Excel / PowerPoint / PDF output | docx / xlsx / pptx / pdf skills | Real tooling, cannot be done by hand |
-| Version-specific framework knowledge | nextjs / tailwind / supabase / claude-api | Updates the training cutoff (v4, v15 …) |
-| Vault cleanup / consolidation | memory consolidation skill | Systematic; by hand it gets messy |
-| File organisation on the machine | file-organizer | Systematic |
-| Multi-step code plan | writing-plans | Plan discipline |
+| Creating and editing Word / Excel / PowerPoint / PDF | docx / xlsx / pptx / pdf | Real tooling; can't be done by hand |
+| Version-specific API or framework | claude-api, nextjs, tailwind v4, supabase … | Updates the training cutoff |
+| A pipeline or process you wrote yourself | video pipeline, document production, deploy runbook | A process, not advice; carries machine-specific paths and traps |
+| Writing plugins / hooks / extensions | the relevant official skill | The contract depends on the version |
+| Systematic file organisation | file-organizer | Hundreds of files at once |
 
-**Rule:** skipping a skill in these categories = quality loss. If the user installed them, respect the investment.
+## Don't call (general advice; it's in training, and your vault holds the newer version)
 
-## TIER 2 — STOP AND THINK (depends)
+| Job | Why |
+|---|---|
+| Design taste, "premium UI", aesthetic guides | First the design rules in your vault + real references + render-look-fix; a skill only for a concrete gap |
+| senior-X, clean-code, best practice, code review, debugging, TDD, planning rituals | A strong model does these by default; the skill fills the context with dead weight |
+| Corporate "bundle" packs (sales, legal, finance …) | Turn them off if unrelated to your work: they load descriptions into every session |
 
-| Task | Skill | Call criterion |
-|---|---|---|
-| Code review | code-reviewer | If a human-eye final read is wanted; a spot check is fine raw |
-| Security audit | security / pentest skills | If a systematic checklist is needed |
-| Complex debugging | systematic-debugging | Multi-layer bugs |
-| Writing tests | test-driven-development | If building TDD discipline |
-| SEO | seo-audit | SEO-focused tasks |
-| DB schema | database-design | New schemas |
+## Rules
 
-## TIER 3 — SKIP (say it, don't be silent)
+- If a loaded skill's advice conflicts with a vault rule, the vault wins; that part of the skill is not applied.
+- If a skill makes the output worse, tell the user and write its name in this file.
+- Combine several skills only when each adds a separate layer of knowledge.
 
-Generic "senior-X" / "clean-code" / "best-practices" skills. The content is already in training data;
-calling them fills the context with dead weight.
+## Signal vs noise — honest calibration
 
-**Skip formula (must be said):**
-> *"Skill check: there is a table match for this task (`senior-backend`) but the content is generic. Skipping, doing it raw."*
-
-## Signal vs Noise — honest calibration
-
-- **SIGNAL:** version correctors (framework skills) · design calibration · file deliverable skills · MCPs · the vault.
-- **NOISE SHELF (keep, don't rely on):** generic skills · most agents (for solo work: "me with a sticky note") · hooks are not capability, they are safety + reminders.
-- **Design multiplier = model taste × the user's clear brief/reference × iteration.** A skill raises the *floor* (prevents bad), not the *ceiling*. For better design invest in a clear brief + strong reference + 2–3 rounds of iteration, not in more skills.
-
-## Anti-patterns
-
-❌ "It's in the table, I'll call it" (without asking what it adds) · ❌ silent call · ❌ silent skip ·
-❌ calling a Tier 3 skill and using 5 % of its output · ❌ skipping a Tier 1 skill and writing raw.
-
-✅ Tier 1: CALL + reason · ✅ Tier 2: SAY the decision · ✅ Tier 3: SKIP + reason.
+- **Signal:** version correctors · file-output tooling · your own process skills · MCPs · the vault.
+- **Noise:** generic skills · most agents for solo work · hooks (not capability, safety + reminders) ·
+  plugins (packaging; their value is the MCP or skill inside).
+- **Quality multiplier = model × a clear brief / strong reference × iteration.** For better output, invest
+  in the brief, the reference and 2-3 rounds of iteration, not in more skills.
 
 ## Installation rule
 
-Skills / agents / commands / hooks / rules are **always installed globally** (`~/.claude/…` or the vault).
-Anything written into the working directory's `.claude/` silently disappears when the folder changes.
-`npx skills add` → the `-g` flag. Exception: the user explicitly says "project-only", or the file is
+Skills / agents / commands / hooks / rules are **always installed globally** (`~/.claude/…` or the
+vault). Anything written into the working directory's `.claude/` silently disappears when the folder
+changes. `npx skills add` → `-g`; afterwards `test -d ~/.claude/skills/<name>`. Exception: the file is
 genuinely project-specific (`launch.json`).

@@ -8,13 +8,14 @@ her düzenlemeden önce yedek al, her prompt'ta kuralları hatırlat. Model "unu
 | `vault-index.sh` | `SessionStart` | Vault index'ini (not adları) her oturuma enjekte eder. Kendini ölçer, 10K sınırına asla ulaşmaz. |
 | `hook-meta.sh` | (yardımcı) | Diğer hook'lara stdin JSON'dan `tool_name|file_path` verir. |
 | `settings.hooks.json` | — | `~/.claude/settings.json`'a birleştirilecek hook bloğu (install.sh yapar). |
+| `settings.remove.json` | — | Eski bir sürümün kaydettiği ve bu sürümün yerine koyduğu komutlar; install.sh birleştirmeden önce bunları birebir eşleşmeyle kaldırır. |
 
 `settings.hooks.json` içindeki hook'lar:
 
 | Olay | Eşleşme | İş |
 |---|---|---|
 | `SessionStart` | — | `vault-index.sh` |
-| `UserPromptSubmit` | — | `behavior-check-reminder.json` + `skill-check-reminder.json` içeriğini her prompt'a ekler (5 kanonik kural + skill tier hatırlatması). Uzun oturumda context sıkıştırılsa bile kurallar geri gelir. |
+| `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) her prompt'a ekler: vault'a bak ve yaz, brief'in son paragrafını tut, kırmızı dışında izin sorma. Uzun oturumda context sıkıştırılsa bile geri gelir. v1.0'daki iki uzun hatırlatmanın (1,7 KB) yerini aldı. |
 | `PreToolUse` | `Edit\|MultiEdit` | Dosyayı düzenlemeden önce `./.backups/<ad>.<zaman>.bak` kopyası alır (cwd'ye göre). |
 | `PostToolUse` | `Edit\|Write` | Dosyada `password = "…"` biçiminde sabit sır arar, bulursa stderr'e uyarı basar. |
 | `PostToolUse` | `Edit\|MultiEdit\|Write` | `~/.claude/changes.log`'a `[zaman] Araç yol` satırı ekler. |
@@ -54,5 +55,8 @@ Commit yine sen atarsın; sadece staging'i unutmazsın.
 2. **"Hook tetikleniyor" ≠ "hook çalışıyor".** `$CLAUDE_TOOL_FILE_PATH` bir sürümde boş gelmeye başladı;
    log'a boş satırlar düştü, yedek hiç alınmadı, kimse iki hafta fark etmedi. `hook-meta.sh` bu yüzden
    stdin JSON'u okur. Ara sıra fiilen test et: bir dosyayı düzenle → `.backups/` oluştu mu bak.
+
+Bir de ölçü: hook çıktısı her oturumda ya da her prompt'ta bağlama girer. Hatırlatma kısa kalır;
+aynı kuralları anayasa zaten söylüyorsa hatırlatma onları dördüncü kez tekrar etmez (v1.1 dersi).
 
 Sağlık kontrolü tek komut: `bash scripts/vault-health.sh`

@@ -32,7 +32,13 @@ if [ -n "${VAULT_DIR:-}" ] && [ -d "$VAULT_DIR" ]; then
   ok "notes: $total  ($line)"
   nofm=0; for f in *.md; do [ "$f" = "MEMORY.md" ] && continue; [ "$f" = "README.md" ] && continue; head -1 "$f" | grep -q '^---' || nofm=$((nofm+1)); done
   [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s) — description will not show in the index"
-  [ -f MEMORY.md ] && ok "MEMORY.md present ($(wc -l < MEMORY.md | tr -d ' ') lines)" || bad "MEMORY.md missing"
+  if [ -f MEMORY.md ]; then
+    mkb=$(( $(wc -c < MEMORY.md) / 1024 ))
+    if [ "$mkb" -gt 100 ]; then warn "MEMORY.md is ${mkb} KB — it has become a document: don't open it in sessions (Grep), shorten each line to one sentence"
+    else ok "MEMORY.md present ($(wc -l < MEMORY.md | tr -d ' ') lines, ${mkb} KB)"; fi
+  else
+    bad "MEMORY.md missing"
+  fi
 else
   bad "vault folder not found: ${VAULT_DIR:-<unset>}"
 fi
@@ -45,8 +51,8 @@ if [ -x "$IDX" ] || [ -f "$IDX" ]; then
   if [ "$SZ" -ge 10000 ]; then bad "index $SZ bytes ≥ 10000 — Claude sees only a 2 KB preview! archive notes now"
   elif [ "$SZ" -gt 9500 ]; then warn "index $SZ bytes > budget 9500 — failsafe active, archive soon"
   else ok "index $SZ bytes (< 9500 budget)"; fi
-  if printf '%s' "$OUT" | grep -q 'seviyesi [45]\|level [45]'; then warn "compression level ≥4 — project/note names shortened; time to archive stale notes"; fi
-  if printf '%s' "$OUT" | grep -q 'ZORLA KESILDI\|FORCE-CUT'; then bad "index force-cut marker present — archive immediately"; fi
+  if printf '%s' "$OUT" | grep -qE 'seviyesi [45]|level [45]'; then warn "compression level ≥4 — project/note names shortened; time to archive stale notes"; fi
+  if printf '%s' "$OUT" | grep -qE 'ZORLA KESILDI|FORCE-CUT'; then bad "index force-cut marker present — archive immediately"; fi
 else
   bad "hook missing: $IDX"
 fi
@@ -65,7 +71,16 @@ S="$CLAUDE_HOME/settings.json"
 if [ -f "$S" ]; then
   grep -q 'vault-index.sh' "$S" && ok "SessionStart → vault-index.sh" || bad "SessionStart hook not registered"
   grep -q 'hook-meta.sh' "$S" && ok "PreToolUse/PostToolUse use hook-meta.sh" || warn "backup/log hooks not registered"
-  grep -q 'behavior-check-reminder.json' "$S" && ok "UserPromptSubmit reminders" || warn "reminder hooks not registered"
+  OLDREM=0; grep -qE 'behavior-check-reminder\.json|skill-check-reminder\.json' "$S" && OLDREM=1
+  if grep -q 'session-reminder.json' "$S"; then
+    if [ -f "$CLAUDE_HOME/session-reminder.json" ]; then ok "UserPromptSubmit → session-reminder.json ($(wc -c < "$CLAUDE_HOME/session-reminder.json" | tr -d ' ') bytes per prompt)"
+    else bad "session-reminder.json is registered but missing in $CLAUDE_HOME — run scripts/install.sh"; fi
+    [ "$OLDREM" -eq 1 ] && warn "the two v1.0 reminders are still registered next to it — the same rules arrive twice on every prompt; run scripts/install.sh again"
+  elif [ "$OLDREM" -eq 1 ]; then
+    warn "v1.0 reminders registered (behavior/skill-check, 1.7 KB per prompt) — run scripts/install.sh to migrate to session-reminder.json"
+  else
+    warn "reminder hook not registered"
+  fi
   grep -q 'CLAUDE_TOOL_FILE_PATH' "$S" && warn "a hook still reads \$CLAUDE_TOOL_FILE_PATH — that variable can arrive empty; switch it to hook-meta.sh"
 else
   bad "settings.json missing"
@@ -74,8 +89,11 @@ fi
 echo "[CLAUDE.md]"
 C="$CLAUDE_HOME/CLAUDE.md"
 if [ -f "$C" ]; then
-  grep -qi 'Hafıza Protokolü\|Memory Protocol' "$C" && ok "memory protocol section present" || warn "no memory protocol section — merge CLAUDE.saltay.md"
-  grep -q 'Kanonik\|Canonical' "$C" && ok "5 canonical rules present" || warn "5 canonical rules missing"
+  grep -qiE 'Hafıza Protokolü|Memory Protocol' "$C" && ok "memory protocol section present" || warn "no memory protocol section — merge CLAUDE.saltay.md"
+  grep -q 'K0' "$C" && grep -q 'K5' "$C" && ok "5 canonical rules present (K0-K5)" || warn "5 canonical rules (K0-K5) missing"
+  ckb=$(( $(wc -c < "$C") / 1024 ))
+  if [ "$ckb" -gt 15 ]; then warn "CLAUDE.md is ${ckb} KB and loads in every session — move inventory/history/long rule texts to the vault (target ≤ 12 KB)"
+  else ok "CLAUDE.md ${ckb} KB"; fi
 else
   bad "CLAUDE.md missing at $C"
 fi

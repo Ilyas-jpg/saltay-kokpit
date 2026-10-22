@@ -1,64 +1,54 @@
 ---
-name: Skill routing — tier bazlı karar rehberi
-description: Görev geldiğinde hangi skill ÇAĞIR / DUR DÜŞÜN / ATLA. Defansif "varsa çağır" değil, değer bazlı. Karar her zaman kullanıcıya görünür.
+name: Skill routing — ne zaman çağrılır, ne zaman çağrılmaz
+description: K4'ün tablosu. Skill varsayılan değil; yalnız bende olmayan, işe ya da sürüme özgü bilgi veriyorsa çağrılır. Genel öğüt skill'leri çağrılmaz; skill öğüdü vault kuralıyla çelişirse vault kazanır.
 type: reference
 priority: critical
 ---
 
-# Skill Routing — Tier Rehberi
+# Skill Routing
 
-> Görev geldiğinde ilk soru: *"Bu skill'in çıktısını gerçekten kullanacak mıyım?"*
-> **Evet, spesifik bilgi gerek** → Tier 1, ÇAĞIR. **Belki** → Tier 2, kararını söyle.
-> **Hayır, eğitimde zaten var** → Tier 3, ATLA + sebebini söyle.
-> Her iki yön de meşru. **Sessiz çağrı veya sessiz atlama yasak.**
+> **Tek soru:** *bu skill bende olmayan, işe ya da sürüme özgü bir bilgi veriyor mu?*
+> Evet → çağır, tek cümleyle söyle. Hayır → çağırma, anlatma.
+>
+> **v1.1 değişikliği:** v1.0'daki "Tier 1 tasarım skill'ini çağır, her görevde kararı söyle" kuralı
+> kaldırıldı. İki sebep: (1) eski modeller için yazılmış skill'ler kuralcıdır ve güçlü modeli dar bir
+> kalıba çeker; bir tasarım skill'inin öğütlerinin yarısı yazarın vault'unda yasak olan "yapay zekâ
+> izleri"ydi; (2) "skill kontrolü: atlıyorum çünkü…" paragrafı her cevaba gürültü ekliyordu.
 
-## TIER 1 — HEMEN ÇAĞIR (skill spesifik değer üretiyor)
+## Çağır (spesifik bilgi taşıyor)
 
-| Görev | Skill türü | Neden |
+| İş | Skill türü | Neden |
 |---|---|---|
-| Frontend tasarım, sayfa, component | tasarım/frontend-design skill'i | Modelin varsayılan "AI estetiği"ne kaymasını frenler |
-| Word / Excel / PowerPoint / PDF üretimi | docx / xlsx / pptx / pdf skill'leri | Gerçek tooling, elle yapılamaz |
-| Sürüm-spesifik framework bilgisi | nextjs / tailwind / supabase / claude-api | Eğitim kesme tarihini günceller (v4, v15 vb.) |
-| Vault temizliği / konsolidasyon | memory konsolidasyon skill'i | Sistemli işlem, elle dağınık olur |
-| Bilgisayar dosya organizasyonu | file-organizer | Sistemli |
-| Çok adımlı kod planı | writing-plans | Plan disiplini |
+| Word / Excel / PowerPoint / PDF üretimi ve düzenleme | docx / xlsx / pptx / pdf | Gerçek araç zinciri; elle yapılmaz |
+| Sürüme özgü API ya da framework | claude-api, nextjs, tailwind v4, supabase … | Eğitim kesme tarihini günceller |
+| Kendi yazdığın hat ya da süreç | video hattı, belge üretimi, deploy runbook'u | Süreçtir, öğüt değil; makineye özgü yol ve tuzak taşır |
+| Eklenti / hook / plugin yazımı | ilgili resmî skill | Sözleşme sürüme bağlı |
+| Sistemli dosya organizasyonu | file-organizer | Tek seferde yüzlerce dosya |
 
-**Kural:** Bu kategorilerde skill atlamak = kalite düşüşü. Kullanıcı bu skill'leri kurduysa yatırımına saygı.
+## Çağırma (genel öğüt; eğitimde var, vault'ta daha güncelini tutuyorsun)
 
-## TIER 2 — DUR DÜŞÜN (durumla)
+| İş | Neden |
+|---|---|
+| Tasarım zevki, "premium UI", estetik kılavuzları | Önce vault'taki tasarım kuralları + gerçek referans + render-gör-düzelt; skill ancak somut bir boşluk varsa |
+| senior-X, clean-code, best-practice, kod review, debug, TDD, plan ritüelleri | Güçlü model bunları varsayılan yapıyor; skill bağlamı boş yükle doldurur |
+| Kurumsal "bundle" paketleri (sales, legal, finance …) | İşinle ilgisi yoksa kapat: her oturuma açıklama yükler |
 
-| Görev | Skill | Çağırma kriteri |
-|---|---|---|
-| Kod review | code-reviewer | İnsan-gözü son okuma istiyorsan; spot-check ham yeter |
-| Güvenlik denetimi | security / pentest skill'leri | Sistematik checklist gerekiyorsa |
-| Karmaşık debug | systematic-debugging | Çok katmanlı bug ise |
-| Test yazımı | test-driven-development | TDD disiplini kuruyorsan |
-| SEO | seo-audit | SEO odaklı görevse |
-| DB şeması | database-design | Yeni şema kuruyorsan |
+## Kurallar
 
-## TIER 3 — ATLA (söyle, sessiz olma)
+- Yüklenmiş bir skill'in öğüdü vault kuralıyla çelişirse vault kazanır; skill'in o kısmı uygulanmaz.
+- Bir skill çıktıyı kötüleştiriyorsa kullanıcıya söyle ve adını bu dosyaya yaz.
+- Birden fazla skill'i yalnız her biri ayrı bir bilgi katmanı ekliyorsa birleştir.
 
-Generic "senior-X" / "clean-code" / "best-practices" skill'leri. İçerik eğitim verisinde zaten var;
-çağırmak = context'i boş yükle doldurmak.
+## Signal vs noise — dürüst kalibrasyon
 
-**Atlama formülü (söylenmesi gerek):**
-> *"Skill check: bu görev için tabloda eşleşme var (`senior-backend`) ama içerik generic. Atlıyorum, ham yapıyorum."*
-
-## Signal vs Noise — dürüst kalibrasyon
-
-- **SIGNAL:** sürüm düzelticiler (framework skill'leri) · tasarım kalibrasyonu · dosya deliverable skill'leri · MCP'ler · vault.
-- **NOISE SHELF (dursun, medet umma):** generic skill'ler · çoğu agent (solo işte "sticky-note'lu ben") · hook'lar capability değil, safety + hatırlatma.
-- **Tasarım çarpanı = model taste × kullanıcının net brief'i/referansı × iterasyon.** Skill *tabanı* yükseltir (kötüye düşmeyi önler), *tavanı* değil. Daha iyi tasarım için yatırım skill'e değil, net brief + güçlü referans + 2-3 tur iterasyona.
-
-## Anti-pattern
-
-❌ "Tabloda var, çağırırım" (ne eklediğini sormadan) · ❌ sessiz çağrı · ❌ sessiz atlama ·
-❌ Tier 3 skill'i çağırıp çıktının %5'ini kullanmak · ❌ Tier 1 skill'i atlayıp ham yazmak.
-
-✅ Tier 1: ÇAĞIR + sebebi · ✅ Tier 2: KARARI söyle · ✅ Tier 3: ATLA + sebebi.
+- **Signal:** sürüm düzelticiler · dosya üretim araç zinciri · kendi süreç skill'lerin · MCP'ler · vault.
+- **Noise:** generic skill'ler · solo işte çoğu agent · hook'lar (yetenek değil, güvenlik + hatırlatma) ·
+  plugin'ler (paketleme; değeri içindeki MCP ya da skill).
+- **Kalite çarpanı = model × net brief / güçlü referans × iterasyon.** Daha iyi çıktı için yatırım skill'e
+  değil, brief'e, referansa ve 2-3 tur iterasyona.
 
 ## Kurulum kuralı
 
-Skill / agent / komut / hook / kural **her zaman global**a kurulur (`~/.claude/…` veya vault). Çalışma
-dizininin `.claude/`'ına yazılan şey klasör değişince sessizce kaybolur. `npx skills add` → `-g` bayrağı.
-İstisna: kullanıcı açıkça "bu projeye özel" derse veya dosya gerçekten o projeye özgüyse (`launch.json`).
+Skill / agent / komut / hook / kural **her zaman global**e kurulur (`~/.claude/…` veya vault). Çalışma
+dizininin `.claude/`'ına yazılan şey klasör değişince sessizce kaybolur. `npx skills add` → `-g`;
+kurduktan sonra `test -d ~/.claude/skills/<ad>`. İstisna: dosya gerçekten o projeye özgüyse (`launch.json`).

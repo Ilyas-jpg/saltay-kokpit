@@ -1,5 +1,5 @@
 {
-  "_comment": "saltay-kokpit hook block. scripts/install.sh merges this into ~/.claude/settings.json and replaces __CLAUDE_HOME__ with the real path (e.g. /c/Users/you/.claude). All commands run under bash — on Windows that is Git Bash, which Claude Code already requires.",
+  "_comment": "saltay-kokpit hook block. scripts/install.sh merges this into ~/.claude/settings.json and replaces __CLAUDE_HOME__ with the real path (e.g. /c/Users/you/.claude). All commands run under bash — on Windows that is Git Bash, which Claude Code already requires. Commands an older release registered and this one replaces are listed in settings.remove.json.",
   "env": {
     "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
   },
@@ -19,11 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat __CLAUDE_HOME__/behavior-check-reminder.json"
-          },
-          {
-            "type": "command",
-            "command": "cat __CLAUDE_HOME__/skill-check-reminder.json"
+            "command": "cat __CLAUDE_HOME__/session-reminder.json"
           }
         ]
       }
