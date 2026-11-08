@@ -158,7 +158,9 @@ trk s1 Edit "$W2/a.js"; trk s1 Write "$W2/b.js"
 check "2 edits: quiet" '[ "$(stopr s1)" = 0 ]'
 trk s1 Edit "$W2/c.js"
 check "3 edits: reminds (exit 2)" '[ "$(stopr s1)" = 2 ]'
-check "names the journal folder" 'grep -q "Hafıza/Günlük" "$SB/jr.err"' "$(cat "$SB/jr.err")"
+# (Windows shows C:\...\Hafıza\Günlük, elsewhere /.../Hafıza/Günlük)
+check "names the journal folder" 'grep -qE "Hafıza[/\\\\]Günlük" "$SB/jr.err"' "$(cat "$SB/jr.err")"
+check "one path style in the message" '! grep -qE "[\\\\][^ ]*/|/[^ ]*[\\\\]" "$SB/jr.err"' "$(cat "$SB/jr.err")"
 check "stop_hook_active: never loops" '[ "$(stopr s1 true)" = 0 ]'
 check "reminds once per stretch" '[ "$(stopr s1)" = 0 ]'
 trk s2 Edit "$W2/a.js"; trk s2 Edit "$W2/b.js"; trk s2 Edit "$W2/c.js"; trk s2 Write "$FV/Hafıza/Günlük/2026-01-02 is.md"
