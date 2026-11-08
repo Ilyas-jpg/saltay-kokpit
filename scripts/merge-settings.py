@@ -8,6 +8,7 @@ See merge-settings.js for what each argument does.
 """
 import json
 import os
+import re
 import sys
 
 args = sys.argv[1:]
@@ -41,8 +42,24 @@ def read_json(p):
     return json.loads(raw) if raw.strip() else {}
 
 
-def fill(s):
-    return s.replace("__CLAUDE_HOME__", home) if home and isinstance(s, str) else s
+def fill(s, h=None):
+    h = h or home
+    return s.replace("__CLAUDE_HOME__", h) if h and isinstance(s, str) else s
+
+
+# Windows: the same folder is /c/Users/x in Git Bash and C:/Users/x for native
+# programs; v1.1 wrote the /c/ form, so removal matches both spellings.
+def home_forms():
+    if not home:
+        return [None]
+    forms = [home]
+    m = re.match(r"^([A-Za-z]):[\\/](.*)$", home)
+    if m:
+        forms.append("/" + m.group(1).lower() + "/" + m.group(2).replace("\\", "/"))
+    m = re.match(r"^/([A-Za-z])/(.*)$", home)
+    if m:
+        forms.append(m.group(1).upper() + ":/" + m.group(2))
+    return forms
 
 
 st = read_json(settings_path)
@@ -54,12 +71,14 @@ for ev, cmds in rm.items():
     if ev.startswith("_") or not isinstance(cmds, list):
         continue
     for c in cmds:
-        gone.setdefault(ev, set()).add(fill(c))
-if uninstall:
-    for ev, groups in add.get("hooks", {}).items():
-        for g in groups:
-            for h in g.get("hooks", []):
-                gone.setdefault(ev, set()).add(fill(h.get("command")))
+        for hf in home_forms():
+            gone.setdefault(ev, set()).add(fill(c, hf))
+for ev, groups in add.get("hooks", {}).items():
+    for g in groups:
+        for h in g.get("hooks", []):
+            # uninstall: every spelling; install: only the OTHER spellings (no duplicates on reinstall)
+            for hf in (home_forms() if uninstall else home_forms()[1:]):
+                gone.setdefault(ev, set()).add(fill(h.get("command"), hf))
 
 st.setdefault("hooks", {})
 removed = 0

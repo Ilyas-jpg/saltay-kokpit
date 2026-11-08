@@ -24,6 +24,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib.sh
+. "$REPO_DIR/scripts/lib.sh"
 TS="$(date +%Y%m%d_%H%M%S)"
 say() { printf '%s\n' "$*"; }
 retire() {
@@ -40,10 +42,12 @@ elif [ "$DRY" -eq 1 ]; then
   say "  [dry-run] would back up $S and remove every saltay hook command"
 else
   cp "$S" "$S.$TS.bak"; say "  backup : $S.$TS.bak"
+  # home path passed exactly as bash spells it (see install.sh), file paths made native
+  N_S=$(native "$S"); N_H=$(native "$REPO_DIR/hooks/settings.hooks.json"); N_R=$(native "$REPO_DIR/hooks/settings.remove.json")
   if command -v node >/dev/null 2>&1; then
-    node "$REPO_DIR/scripts/merge-settings.js" "$S" "$REPO_DIR/hooks/settings.hooks.json" "$REPO_DIR/hooks/settings.remove.json" --home "$CLAUDE_HOME" --uninstall
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' node "$(native "$REPO_DIR/scripts/merge-settings.js")" "$N_S" "$N_H" "$N_R" --home "$CLAUDE_HOME" --uninstall
   elif python3 -c 'import sys' >/dev/null 2>&1; then
-    python3 "$REPO_DIR/scripts/merge-settings.py" "$S" "$REPO_DIR/hooks/settings.hooks.json" "$REPO_DIR/hooks/settings.remove.json" --home "$CLAUDE_HOME" --uninstall
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' python3 "$(native "$REPO_DIR/scripts/merge-settings.py")" "$N_S" "$N_H" "$N_R" --home "$CLAUDE_HOME" --uninstall
   else
     say "  !! neither node nor python3 found — remove the saltay hook commands from $S by hand"
   fi

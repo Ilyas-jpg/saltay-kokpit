@@ -20,8 +20,8 @@ her düzenlemeden önce yedek al, her prompt'ta kuralları hatırlat. Model "unu
 |---|---|---|
 | `SessionStart` | — | `vault-index.sh` |
 | `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) her prompt'a ekler: vault'a bak ve yaz, brief'in son paragrafını tut, kırmızı dışında izin sorma. Uzun oturumda context sıkıştırılsa bile geri gelir. Klasörlü kasada `session-reminder.folders.json` kurulur (MOC'a link ekle). |
-| `PreToolUse` | `Edit\|MultiEdit\|Write` | `backup.sh`: var olan dosyanın `./.backups/<ad>.<yol-checksum>.<zaman>.bak` kopyası (cwd'ye göre). `.backups/` ilk açılışta kendi `.gitignore`'unu (`*`) yazar. Hiçbir şey silinmez. |
-| `PostToolUse` | `Edit\|MultiEdit\|Write` | `secret-scan.sh`: `password/api_key/... = "…"` ya da `"api_key": "…"` atamaları ve bilinen anahtar biçimleri (`sk-ant-`, `ghp_`, `AKIA`, `PRIVATE KEY` …). Bulursa satır numarasını (değeri değil) **exit 2** ile Claude'a verir; Claude değeri env'e taşır. `.env` ve `*.example` atlanır. |
+| `PreToolUse` | `Edit\|MultiEdit\|Write` | `backup.sh`: var olan dosyanın `<ad>.<yol-checksum>.<zaman>.bak` kopyası. Dosya bir git reposundaysa `<repo kökü>/.backups/`, değilse `~/.claude/saltay-backups/` (sabit klasör için `vault.conf`'ta `SALTAY_BACKUP_DIR`). Her yedek klasörü ilk açılışta kendi `.gitignore`'unu (`*`) yazar. Hiçbir şey silinmez. |
+| `PostToolUse` | `Edit\|MultiEdit\|Write` | `secret-scan.sh`: `password/api_key/... = "…"` ya da `"api_key": "…"` atamaları ve bilinen anahtar biçimleri (`sk-ant-`, `ghp_`, `AKIA`, `PRIVATE KEY` …). Bulursa satır numarasını (değeri değil) **exit 2** ile Claude'a verir; Claude değeri env'e taşır. `.env` ve `*.example` atlanır; kasıtlı sahte anahtar içeren satıra `saltay:allow` yaz. |
 | `PostToolUse` | `Edit\|MultiEdit\|Write` | `change-log.sh`: `~/.claude/changes.log`'a `[zaman] Araç yol`; 1 MB'ta `changes.<tarih>.log` olur. |
 
 > v1.1'e kadar stderr + exit 0 ile basılan sır uyarısı **modele hiç ulaşmıyordu**: Claude Code exit 0'daki

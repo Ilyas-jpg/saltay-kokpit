@@ -15,13 +15,21 @@ existing folder-based Obsidian vaults, an uninstaller and CI.
   Code bunu modele göstermez; artık exit 2 ile Claude'a gider. Regex'teki `\x27` grep'te tek tırnak değil
   `\ x 2 7` karakterleriydi: tek tırnaklı değerler, `"key": "value"` (JSON/YAML) ve içinde x/2/7 geçen
   değerler kaçıyordu. Bilinen anahtar biçimleri eklendi (`sk-ant-`, `sk-`, `ghp_`, `AKIA`, `AIza`, `xox?-`,
-  `PRIVATE KEY`); değer asla yazdırılmaz, yalnız satır no. · The warning never reached the model (stderr
-  + exit 0); now exit 2. `\x27` inside a grep bracket matched `\ x 2 7`, not a quote. Known token formats
-  added; the value itself is never printed.
+  `PRIVATE KEY`); değer asla yazdırılmaz, yalnız satır no. Kasıtlı sahte anahtar içeren satır (test, belge)
+  `saltay:allow` işaretiyle susturulur. · The warning never reached the model (stderr + exit 0); now
+  exit 2. `\x27` inside a grep bracket matched `\ x 2 7`, not a quote. Known token formats added; the
+  value is never printed; a line marked `saltay:allow` is skipped.
+- **Windows yol yazımı / path spelling:** Git Bash `/c/...` argümanlarını node'a `C:/...` diye geçirir;
+  v1.1'den yükseltmede eski komutların birebir eşleşmesi bu yüzden tutmazdı. Birleştirici artık yolu
+  bash'in yazdığı gibi alır ve iki yazımı da tanır; yeniden kurulumda kopya bırakmaz. · Git Bash rewrites
+  /c/ paths for node; the merger now gets the bash spelling and matches both.
 - **Yedek / Backup** (`hooks/backup.sh`): `Write` ile bir dosyanın tamamen ezilmesi yedeklenmiyordu
-  (matcher yalnız `Edit|MultiEdit`). Aynı adlı farklı klasördeki dosyalar artık çakışmaz (yol checksum'ı);
-  `.backups/` kendi `.gitignore`'unu (`*`) yazar, kopyalanan bir `.env` commit'lenemez. · `Write` over an
-  existing file is now backed up; same-name files no longer collide; `.backups/` ignores itself in git.
+  (matcher yalnız `Edit|MultiEdit`). Yedek artık oturumun çalışma klasörüne değil, dosyanın **git
+  reposunun köküne** (`<repo>/.backups/`), repo dışındaki dosyalar için `~/.claude/saltay-backups/`'a
+  gider: Masaüstü'nde açılmış bir oturum `D:\dev` dosyalarının yedeğini (OneDrive ile senkronlanan)
+  Masaüstü'ne saçıyordu. Sabit klasör için `SALTAY_BACKUP_DIR`. Aynı adlı dosyalar çakışmaz (yol
+  checksum'ı); her yedek klasörü kendi `.gitignore`'unu (`*`) yazar. · Backups go to the file's repo root
+  or `~/.claude/saltay-backups/`, not the session's cwd; `Write` is covered; backup folders ignore themselves.
 - **Boşluklu yol / Paths with spaces:** `settings.json`'a yazılan hook komutlarında yol tırnaksızdı;
   `C:\Users\John Doe` gibi bir ev klasöründe bütün hook'lar bozuluyordu. · Hook commands quote the path.
 - **Türkçe proje adları / Turkish names** (`scripts/lib.sh`): "Şirket Sitesi" → `irket-sitesi` oluyordu;
@@ -46,7 +54,7 @@ existing folder-based Obsidian vaults, an uninstaller and CI.
   aynı. `install.sh` düzeni kendisi tanır (`--layout auto`). · Use an existing sub-folder vault as is.
 - `scripts/uninstall.sh` (+ `install.ps1 -Uninstall`): bütün saltay hook komutları (eski sürümler dahil)
   birebir eşleşmeyle çıkar, dosyalar `.bak` olur; vault, CLAUDE.md, env dokunulmaz. · reversible uninstall.
-- `tests/run.sh` (55 test, sahte HOME) + `.github/workflows/ci.yml`: shellcheck, JSON, LF; Ubuntu,
+- `tests/run.sh` (58 test, sahte HOME) + `.github/workflows/ci.yml`: shellcheck, JSON, LF; Ubuntu,
   macOS, Windows'ta uçtan uca. · end-to-end tests and CI on three OSes.
 - `install.sh`: `--layout`, `--core-notes`, `--no-projects`, `--disable-background-tasks`; `VERSION`
   dosyası, `~/.claude/saltay-kokpit.version`, kurulum sonunda `settings.json` JSON doğrulaması.

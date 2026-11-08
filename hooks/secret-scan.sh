@@ -14,7 +14,8 @@
 #
 # What it reports: line number + pattern name. Never the value itself.
 # Skipped: .env files (that IS where secrets belong — keep them out of git),
-# *.example / *.sample, binaries, files over 1 MB, placeholder values.
+# *.example / *.sample, binaries, files over 1 MB, placeholder values, and any
+# line containing "saltay:allow" (deliberate fake keys in tests or docs).
 # =============================================================================
 
 m=$(bash "$(dirname "$0")/hook-meta.sh"); f=${m#*|}
@@ -42,8 +43,9 @@ google-api-key|AIza[0-9A-Za-z_-]{35}
 slack-token|xox[abprs]-[A-Za-z0-9-]{10,}
 private-key-block|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 
-# lines that are obviously not real secrets
-PLACEHOLDER='example|placeholder|your[_-]|<[a-z_]+>|changeme|xxxxxx|\*\*\*\*|\$\{|process\.env|os\.environ|getenv|import\.meta\.env'
+# lines that are obviously not real secrets — plus an explicit opt-out: a line
+# carrying the marker "saltay:allow" (e.g. a test fixture) is never reported.
+PLACEHOLDER='saltay:allow|example|placeholder|your[_-]|<[a-z_]+>|changeme|xxxxxx|\*\*\*\*|\$\{|process\.env|os\.environ|getenv|import\.meta\.env'
 
 hits=""
 while IFS='|' read -r name rx; do

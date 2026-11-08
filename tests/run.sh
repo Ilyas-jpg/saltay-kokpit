@@ -17,7 +17,9 @@ ok()   { PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; }
 fail() { FAILN=$((FAILN+1)); printf '  FAIL %s\n' "$1"; [ -n "${2:-}" ] && printf '%s\n' "$2" | sed 's/^/       /'; }
 check() { if eval "$2"; then ok "$1"; else fail "$1" "${3:-}"; fi; }
 # count commands containing $2 in settings file $1
-ncmd() { node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));let n=0;for(const e of Object.values(s.hooks||{}))for(const g of e)for(const h of g.hooks||[])if(h.command.includes(process.argv[2]))n++;console.log(n)' "$1" "$2"; }
+# (needle passed without MSYS path conversion: commands keep the bash spelling of the path)
+ncmd() { MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));let n=0;for(const e of Object.values(s.hooks||{}))for(const g of e)for(const h of g.hooks||[])if(h.command.includes(process.argv[2]))n++;console.log(n)' "$(native_path "$1")" "$2"; }
+native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 valid_json() { node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$1" 2>/dev/null; }
 meta() { printf '%s' "$1" | bash "$REPO/hooks/hook-meta.sh"; }
 scan() { printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$1" | bash "$REPO/hooks/secret-scan.sh" 2>/dev/null; echo $?; }
@@ -32,25 +34,34 @@ check "notebook_path fallback" '[ "$(meta "$J3")" = "NotebookEdit|/n.ipynb" ]' "
 
 echo "[secret-scan]"
 W="$SB/scan"; mkdir -p "$W"
-printf "api_key = 'abcdefghijklmnop'\n" > "$W/a.py"
-printf 'password = "abc27xyz12345"\n' > "$W/b.py"
-printf '{"api_key": "abcdefghijklmnop"}\n' > "$W/c.json"
-printf 'const k = "sk-ant-api03-%s";\n' "abcdefghijklmnopqrstuvwxyz0123" > "$W/d.js"
-printf 'AWS=AKIAABCDEFGHIJKLMNOP\n' > "$W/e.sh"
+# Fake keys below are fixtures; the trailing marker keeps the scanner quiet on THIS file.
+printf "api_key = 'abcdefghijklmnop'\n" > "$W/a.py"                                 # saltay:allow
+printf 'password = "abc27xyz12345"\n' > "$W/b.py"                                    # saltay:allow
+printf '{"api_key": "abcdefghijklmnop"}\n' > "$W/c.json"                             # saltay:allow
+printf 'const k = "sk-ant-api03-%s";\n' "abcdefghijklmnopqrstuvwxyz0123" > "$W/d.js" # saltay:allow
+printf 'AWS=AKIAABCDEFGHIJKLMNOP\n' > "$W/e.sh"                                      # saltay:allow
 printf 'password = "your_password_here"\napi_key = process.env.API_KEY\n' > "$W/f.py"
 printf 'API_KEY=abcdefghijklmnop\n' > "$W/.env"
 printf 'nothing to see here\n' > "$W/g.txt"
+printf 'password = "abcdefghijklm"  # saltay:allow\n' > "$W/h.py"
 for f in a.py b.py c.json d.js e.sh; do check "detects $f (exit 2)" '[ "$(scan "$W/'$f'")" = 2 ]'; done
-for f in f.py .env g.txt; do check "ignores $f (exit 0)" '[ "$(scan "$W/'$f'")" = 0 ]'; done
+for f in f.py .env g.txt h.py; do check "ignores $f (exit 0)" '[ "$(scan "$W/'$f'")" = 0 ]'; done
 OUTMSG=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$W/a.py" | bash "$REPO/hooks/secret-scan.sh" 2>&1 >/dev/null)
 check "never prints the secret value" '! printf "%s" "$OUTMSG" | grep -q abcdefghijklmnop'
 
 echo "[backup]"
+BH="$SB/bh/.claude"; mkdir -p "$BH/hooks"; cp "$REPO/hooks/backup.sh" "$REPO/hooks/hook-meta.sh" "$BH/hooks/"
+bk() { printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$1" | SALTAY_CONF="$SB/none.conf" bash "$BH/hooks/backup.sh"; }
 P="$SB/proj"; mkdir -p "$P/x" "$P/y"; printf 'one\n' > "$P/x/same.txt"; printf 'two\n' > "$P/y/same.txt"
-( cd "$P" && for f in "$P/x/same.txt" "$P/y/same.txt"; do printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$f" | bash "$REPO/hooks/backup.sh"; done )
+git init -q "$P"
+( cd "$SB" && bk "$P/x/same.txt" && bk "$P/y/same.txt" )
 check "Write over an existing file is backed up" '[ "$(ls "$P/.backups" | grep -c "^same.txt")" = 2 ]'
+check "git file -> repo root .backups/, not the cwd" '[ ! -d "$SB/.backups" ]'
 check ".backups/ ignores itself in git" '[ "$(cat "$P/.backups/.gitignore")" = "*" ]'
-( cd "$P" && printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$P/new.txt" | bash "$REPO/hooks/backup.sh" ); check "new file: no backup, no error" '[ $? -eq 0 ]'
+L="$SB/loose"; mkdir -p "$L"; printf 'x\n' > "$L/note.md"
+( cd "$SB" && bk "$L/note.md" )
+check "non-git file -> ~/.claude/saltay-backups/" '[ "$(ls "$BH/saltay-backups" | grep -c "^note.md")" = 1 ]'
+( cd "$P" && bk "$P/new.txt" ); check "new file: no backup, no error" '[ $? -eq 0 ]'
 
 echo "[slugify]"
 . "$REPO/scripts/lib.sh"
@@ -85,16 +96,19 @@ check "MEMORY.md 📦 marker" 'grep -qF "📦 [[proje_sirket_sitesi]]" "$HOME/va
 
 echo "[upgrade from v1.1 + user hooks kept]"
 CH2="$HOME/up/.claude"; mkdir -p "$CH2"
+# fill the placeholder with sed in bash, exactly like the v1.1 installer did: on Windows this
+# keeps the Git Bash /c/... spelling that node would otherwise see as C:/...
+sed "s|__CLAUDE_HOME__|$CH2|g" "$REPO/hooks/settings.remove.json" > "$SB/remove.filled.json"
 node -e '
-const fs=require("fs"),[rm,out,home]=process.argv.slice(1);
-const r=JSON.parse(fs.readFileSync(rm,"utf8")),f=s=>s.split("__CLAUDE_HOME__").join(home);
+const fs=require("fs"),[rm,out]=process.argv.slice(1);
+const r=JSON.parse(fs.readFileSync(rm,"utf8")),f=s=>s;
 const st={hooks:{}};
 st.hooks.SessionStart=[{hooks:[{type:"command",command:f(r.SessionStart[0])}]}];
 st.hooks.UserPromptSubmit=[{hooks:[{type:"command",command:f(r.UserPromptSubmit[2])}]}];
 st.hooks.PreToolUse=[{matcher:"Edit|MultiEdit",hooks:[{type:"command",command:f(r.PreToolUse[0])}]},{matcher:"Bash",hooks:[{type:"command",command:"echo mine"}]}];
 st.hooks.PostToolUse=[{matcher:"Edit|Write",hooks:[{type:"command",command:f(r.PostToolUse[0])}]},{matcher:"Edit|MultiEdit|Write",hooks:[{type:"command",command:f(r.PostToolUse[1])}]}];
 st.permissions={allow:["Bash(ls:*)"]};
-fs.writeFileSync(out,JSON.stringify(st,null,2));' "$REPO/hooks/settings.remove.json" "$CH2/settings.json" "$CH2"
+fs.writeFileSync(out,JSON.stringify(st,null,2));' "$SB/remove.filled.json" "$CH2/settings.json"
 bash "$REPO/scripts/install.sh" --vault "$HOME/vault" --no-projects --claude-home "$CH2" >/dev/null 2>&1
 check "old inline commands removed" '[ "$(ncmd "$CH2/settings.json" "hook-meta.sh); ")" = 0 ]'
 check "5 new commands" '[ "$(ncmd "$CH2/settings.json" "$CH2/hooks/")" -eq 4 ] && [ "$(ncmd "$CH2/settings.json" "session-reminder")" -eq 1 ]'

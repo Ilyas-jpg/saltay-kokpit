@@ -33,20 +33,22 @@ if [ -n "${VAULT_DIR:-}" ] && [ -d "$VAULT_DIR" ]; then
   ok "folder: $VAULT_DIR"
   cd "$VAULT_DIR" || exit 1
   if [ "${VAULT_LAYOUT:-flat}" = "folders" ]; then
-    LIST=$(find . \( -name .obsidian -o -name .trash -o -name .git -o -name node_modules \) -prune -o -type f -name '*.md' -print 2>/dev/null)
+    # same folders the index skips: templates + EXCLUDE_DIRS (archives stay: Grep still reads them)
+    EXRX="/(Templates|templates|Şablonlar|Sablonlar|_templates$(printf '%s' "${EXCLUDE_DIRS:-}" | tr ';' '\n' | sed '/^$/d; s/[.[\*^$()+?{|]/\\&/g; s/^/|/' | tr -d '\n'))/"
+    LIST=$(find . \( -name .obsidian -o -name .trash -o -name .git -o -name node_modules \) -prune -o -type f -name '*.md' -print 2>/dev/null | grep -vE "$EXRX")
     total=$(printf '%s\n' "$LIST" | grep -c '\.md$')
     per=$(printf '%s\n' "$LIST" | grep '\.md$' | sed 's|^\./||; s|/[^/]*$||; s|^[^/]*\.md$|.|' | sort | uniq -c | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s %s · ", $0, c}' | sed 's/ · $//')
     ok "notes: $total  ($per)"
-    nofm=0; nosum=0
+    nofm=0; nosum=0; nofm_l=""; nosum_l=""
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      head -1 "$f" | grep -q '^---' || { nofm=$((nofm+1)); continue; }
-      head -40 "$f" | grep -qE '^(summary|description):' || nosum=$((nosum+1))
+      if ! head -1 "$f" | grep -q '^---'; then nofm=$((nofm+1)); nofm_l="$nofm_l${nofm_l:+, }${f#./}"; continue; fi
+      head -40 "$f" | grep -qE '^(summary|description):' || { nosum=$((nosum+1)); nosum_l="$nosum_l${nosum_l:+, }${f#./}"; }
     done <<EOF
 $LIST
 EOF
-    [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s)"
-    [ "$nosum" -eq 0 ] && ok "summary: every note has one" || warn "$nosum note(s) without summary:/description: — they show without a description in the index"
+    [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s): $(printf '%s' "$nofm_l" | cut -c1-300)"
+    [ "$nosum" -eq 0 ] && ok "summary: every note has one" || warn "$nosum note(s) without summary:/description: — no description in the index: $(printf '%s' "$nosum_l" | cut -c1-300)"
     # orphan notes: no [[link]] to them anywhere (MOCs and root notes excluded)
     LINKS=$(printf '%s\n' "$LIST" | grep '\.md$' | tr '\n' '\0' | xargs -0 grep -oh '\[\[[^]|#]*' 2>/dev/null | sed 's/^\[\[//; s|.*/||' | sort -u)
     orph=""
@@ -107,7 +109,7 @@ fi
 SCAN="$CLAUDE_HOME/hooks/secret-scan.sh"
 if [ -f "$SCAN" ]; then
   T=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/saltay-scan.$$"); mv "$T" "$T.py" 2>/dev/null; T="$T.py"
-  printf "api_key = 'abcdefgh27x0123456'\n" > "$T"
+  printf "api_key = 'abcdefgh27x0123456'\n" > "$T"   # fake key for the self-test — saltay:allow
   printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$T" | bash "$SCAN" 2>/dev/null; rc=$?
   rm -f "$T"
   [ "$rc" -eq 2 ] && ok "secret-scan self-test: caught and reported to Claude (exit 2)" || bad "secret-scan self-test failed (exit $rc, expected 2)"
@@ -161,15 +163,21 @@ if [ -f "$CLAUDE_HOME/changes.log" ]; then
 else
   warn "changes.log not created yet (appears after the first Edit/Write)"
 fi
-if [ -d "$START_DIR/.backups" ]; then
-  nb=$(ls "$START_DIR/.backups" | wc -l | tr -d ' ')
-  kb=$(du -sk "$START_DIR/.backups" 2>/dev/null | cut -f1)
-  if [ "${kb:-0}" -gt 51200 ]; then warn ".backups/ here: $nb files, $((kb/1024)) MB — move old ones to .curation-trash-<date>/ (never auto-deleted)"
-  else ok ".backups/ here: $nb files, ${kb:-?} KB"; fi
-  [ -f "$START_DIR/.backups/.gitignore" ] || warn ".backups/ has no .gitignore (created by v1.1) — add one containing * so backups are never committed"
-else
-  warn "no .backups/ in $START_DIR yet — edit a file with Claude in this folder and check again"
-fi
+# backups go to <git root>/.backups/ for repo files, ~/.claude/saltay-backups/ otherwise (v1.2)
+bk_report() {  # bk_report <dir> <label>
+  local nb kb
+  nb=$(ls "$1" | wc -l | tr -d ' ')
+  kb=$(du -sk "$1" 2>/dev/null | cut -f1)
+  if [ "${kb:-0}" -gt 51200 ]; then warn "$2: $nb files, $((kb/1024)) MB — move old ones to .curation-trash-<date>/ (never auto-deleted)"
+  else ok "$2: $nb files, ${kb:-?} KB"; fi
+  [ -f "$1/.gitignore" ] || warn "$2 has no .gitignore (created by v1.1) — add one containing * so backups are never committed"
+}
+found=0
+GROOT=$(git -C "$START_DIR" rev-parse --show-toplevel 2>/dev/null || true)
+[ -n "${SALTAY_BACKUP_DIR:-}" ] && [ -d "$SALTAY_BACKUP_DIR" ] && { bk_report "$SALTAY_BACKUP_DIR" "SALTAY_BACKUP_DIR"; found=1; }
+[ -n "$GROOT" ] && [ -d "$GROOT/.backups" ] && { bk_report "$GROOT/.backups" "repo .backups/"; found=1; }
+[ -d "$CLAUDE_HOME/saltay-backups" ] && { bk_report "$CLAUDE_HOME/saltay-backups" "~/.claude/saltay-backups/"; found=1; }
+[ "$found" -eq 1 ] || warn "no backups yet — edit a file with Claude and check again"
 
 echo
 [ "$FAIL" -eq 0 ] && echo "result: healthy" || { echo "result: PROBLEMS FOUND (see ❌)"; exit 1; }

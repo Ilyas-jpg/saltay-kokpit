@@ -254,13 +254,17 @@ fi
 # ----------------------------------------------------------- 5. settings.json
 say "[5/6] settings.json hooks"
 SETTINGS="$CLAUDE_HOME/settings.json"
-MERGER=""
-if command -v node >/dev/null 2>&1; then MERGER="node $REPO_DIR/scripts/merge-settings.js"
-elif python3 -c 'import sys' >/dev/null 2>&1; then MERGER="python3 $REPO_DIR/scripts/merge-settings.py"   # (Windows Store stub fails this test)
+MERGER=""; MERGE_SCRIPT=""
+if command -v node >/dev/null 2>&1; then MERGER="node"; MERGE_SCRIPT="merge-settings.js"
+elif python3 -c 'import sys' >/dev/null 2>&1; then MERGER="python3"; MERGE_SCRIPT="merge-settings.py"   # (Windows Store stub fails this test)
 fi
+# MSYS (Git Bash) rewrites /c/... arguments to C:/... for native programs. The home
+# path must reach the merger exactly as bash spells it — that is what v1.1 wrote, and
+# exact-match removal depends on it. The JS/PY merger still knows both spellings.
 merge() {  # merge <block.json> [remove.json]
-  if [[ "$MERGER" == node* ]]; then node "$REPO_DIR/scripts/merge-settings.js" "$SETTINGS" "$@" --home "$CLAUDE_HOME"
-  else python3 "$REPO_DIR/scripts/merge-settings.py" "$SETTINGS" "$@" --home "$CLAUDE_HOME"; fi
+  local args=() a
+  for a in "$REPO_DIR/scripts/$MERGE_SCRIPT" "$SETTINGS" "$@"; do args+=("$(native "$a")"); done
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$MERGER" "${args[@]}" --home "$CLAUDE_HOME"
 }
 if [ "$DRY" -eq 1 ]; then
   say "  [dry-run] would merge hooks into $SETTINGS"
@@ -269,7 +273,7 @@ elif [ -n "$MERGER" ]; then
   backup_if_exists "$SETTINGS"
   merge "$REPO_DIR/hooks/settings.hooks.json" "$REPO_DIR/hooks/settings.remove.json"
   if [ "$BG_ENV" -eq 1 ]; then merge "$REPO_DIR/hooks/settings.env.json" >/dev/null; say "  env    : CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1"; fi
-  say "  merged : $SETTINGS (${MERGER%% *})"
+  say "  merged : $SETTINGS ($MERGER)"
 else
   sed "s|__CLAUDE_HOME__|$(sed_escape "$CLAUDE_HOME")|g" "$REPO_DIR/hooks/settings.hooks.json" > "$CLAUDE_HOME/settings.saltay.json"
   say "  !! neither node nor python3 found — hook block written to"

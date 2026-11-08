@@ -13,6 +13,10 @@ slugify() {
     | LC_ALL=C sed 's/[^a-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//'
 }
 
+# a file path a native Windows program (node, python) can open: C:\... under Git Bash,
+# unchanged elsewhere. Needed when MSYS path conversion is switched off for a call.
+native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+
 # double-quote a value for a sourced shell config file (vault.conf): "C:/My \"Vault\""
 dq() { printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"$`]/\\&/g')"; }
 

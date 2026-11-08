@@ -37,7 +37,19 @@ const readJson = (p) => {
   const raw = fs.readFileSync(p, "utf8").replace(/^﻿/, "");
   return raw.trim() ? JSON.parse(raw) : {};
 };
-const fill = (s) => (home && typeof s === "string" ? s.split("__CLAUDE_HOME__").join(home) : s);
+const fill = (s, h = home) => (h && typeof s === "string" ? s.split("__CLAUDE_HOME__").join(h) : s);
+// On Windows the same folder has two spellings: Git Bash /c/Users/x and C:/Users/x
+// (MSYS rewrites /c/... arguments to C:/... when it starts node). v1.1 wrote the
+// /c/ form with sed, so removal must match both.
+const homeForms = (() => {
+  if (!home) return [null];
+  const forms = new Set([home]);
+  let m = home.match(/^([A-Za-z]):[\\/](.*)$/);
+  if (m) forms.add("/" + m[1].toLowerCase() + "/" + m[2].replace(/\\/g, "/"));
+  m = home.match(/^\/([A-Za-z])\/(.*)$/);
+  if (m) forms.add(m[1].toUpperCase() + ":/" + m[2]);
+  return [...forms];
+})();
 
 const st = readJson(settingsPath);
 const add = readJson(blockPath);
@@ -45,14 +57,17 @@ const rm = readJson(removePath);
 
 // commands to remove: { event: Set(command) }
 const gone = {};
-const mark = (ev, cmd) => { (gone[ev] = gone[ev] || new Set()).add(fill(cmd)); };
+const mark = (ev, cmd) => { for (const h of homeForms) (gone[ev] = gone[ev] || new Set()).add(fill(cmd, h)); };
 for (const ev of Object.keys(rm)) {
   if (ev.startsWith("_") || !Array.isArray(rm[ev])) continue;
   for (const c of rm[ev]) mark(ev, c);
 }
-if (uninstall) {
-  for (const ev of Object.keys(add.hooks || {})) {
-    for (const g of add.hooks[ev]) for (const h of g.hooks || []) mark(ev, h.command);
+for (const ev of Object.keys(add.hooks || {})) {
+  for (const g of add.hooks[ev]) for (const h of g.hooks || []) {
+    if (uninstall) mark(ev, h.command);
+    // install: this release's commands written with the OTHER spelling of the same
+    // home folder are replaced too, so a reinstall never leaves duplicates.
+    else for (const hf of homeForms.slice(1)) (gone[ev] = gone[ev] || new Set()).add(fill(h.command, hf));
   }
 }
 
