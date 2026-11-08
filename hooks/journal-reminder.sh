@@ -91,17 +91,19 @@ if [ "$wrote" -eq 1 ]; then echo "R" >> "$log"; exit 0; fi
 echo "R" >> "$log"
 
 today=$(date +%Y-%m-%d)
-SHOW="$VAULT_DIR"; command -v cygpath >/dev/null 2>&1 && SHOW=$(cygpath -w "$VAULT_DIR")
+SHOW="$VAULT_DIR"; SHOWJ="$VAULT_DIR/$JOURNAL_DIR"
+# one path style per path: C:\...\Günlük on Windows (not C:\...\CLAUDE/Hafıza/Günlük)
+if command -v cygpath >/dev/null 2>&1; then SHOW=$(cygpath -w "$VAULT_DIR"); SHOWJ=$(cygpath -w "$VAULT_DIR/$JOURNAL_DIR"); fi
 if [ "$VAULT_LANG" = "en" ]; then
   if [ "$VAULT_LAYOUT" = "folders" ] && [ -n "$JOURNAL_DIR" ]; then
-    where="an atomic note in $SHOW/$JOURNAL_DIR (\"$today <topic>.md\", same format as the existing ones) and link it from that folder's MOC"
+    where="an atomic note in $SHOWJ (\"$today <topic>.md\", same format as the existing ones) and link it from that folder's MOC"
   else
     where="the vault ($SHOW): project / HANDOFF note or a dated line in the decisions note"
   fi
   msg="saltay journal-reminder: this stretch of work ($edits file edit(s), $cmds command(s)) ended without a journal entry. If it produced something worth finding in 3 months (a delivery, a decision, a fix, a new tool, a file location), write a short summary to $where. If it did not, write nothing and just say \"no journal entry needed\". Never write secrets. Then finish your answer as you normally would."
 else
   if [ "$VAULT_LAYOUT" = "folders" ] && [ -n "$JOURNAL_DIR" ]; then
-    where="$SHOW/$JOURNAL_DIR altına atomik not (\"$today <konu>.md\", mevcut günlük notlarının biçiminde) yaz ve o klasörün MOC'una [[link]] ekle"
+    where="$SHOWJ altına atomik not (\"$today <konu>.md\", mevcut günlük notlarının biçiminde) yaz ve o klasörün MOC'una [[link]] ekle"
   else
     where="vault'a ($SHOW) yaz: proje / HANDOFF notu ya da kararlar notuna tarihli satır"
   fi
