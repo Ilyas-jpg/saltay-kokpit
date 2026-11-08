@@ -98,7 +98,7 @@ else
 fi
 
 echo "[hook scripts]"
-for h in hook-meta.sh backup.sh secret-scan.sh change-log.sh; do
+for h in hook-meta.sh backup.sh secret-scan.sh change-log.sh session-track.sh journal-reminder.sh; do
   [ -f "$CLAUDE_HOME/hooks/$h" ] && ok "hooks/$h" || bad "hooks/$h missing — run scripts/install.sh"
 done
 META="$CLAUDE_HOME/hooks/hook-meta.sh"
@@ -124,6 +124,12 @@ if [ -f "$S" ]; then
   grep -q 'vault-index.sh' "$S" && ok "SessionStart → vault-index.sh" || bad "SessionStart hook not registered"
   grep -q 'backup.sh' "$S" && ok "PreToolUse → backup.sh" || warn "backup hook not registered"
   grep -q 'secret-scan.sh' "$S" && ok "PostToolUse → secret-scan.sh + change-log.sh" || warn "secret-scan hook not registered"
+  if grep -q 'journal-reminder.sh' "$S" && grep -q 'session-track.sh' "$S"; then
+    if [ "${JOURNAL_REMIND:-1}" = "0" ]; then ok "Stop → journal-reminder.sh (turned off: JOURNAL_REMIND=0)"
+    else ok "Stop → journal-reminder.sh (after ≥${JOURNAL_MIN_EDITS:-3} edits or ≥${JOURNAL_MIN_COMMANDS:-15} commands${JOURNAL_DIR:+, journal: $JOURNAL_DIR})"; fi
+  else
+    warn "journal reminder not registered (Stop → journal-reminder.sh, PostToolUse → session-track.sh) — run scripts/install.sh"
+  fi
   grep -q 'hooks/hook-meta.sh); f=' "$S" && warn "v1.1 inline hook commands still registered — run scripts/install.sh again (it replaces them)"
   OLDREM=0; grep -qE 'behavior-check-reminder\.json|skill-check-reminder\.json' "$S" && OLDREM=1
   if grep -q 'session-reminder.json' "$S"; then

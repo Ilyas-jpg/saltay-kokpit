@@ -54,7 +54,17 @@ existing folder-based Obsidian vaults, an uninstaller and CI.
   aynı. `install.sh` düzeni kendisi tanır (`--layout auto`). · Use an existing sub-folder vault as is.
 - `scripts/uninstall.sh` (+ `install.ps1 -Uninstall`): bütün saltay hook komutları (eski sürümler dahil)
   birebir eşleşmeyle çıkar, dosyalar `.bak` olur; vault, CLAUDE.md, env dokunulmaz. · reversible uninstall.
-- `tests/run.sh` (58 test, sahte HOME) + `.github/workflows/ci.yml`: shellcheck, JSON, LF; Ubuntu,
+- **Günlük hatırlatıcı / Journal reminder** (`hooks/journal-reminder.sh` + `hooks/session-track.sh`):
+  "önemli işin sonunda oturum özeti yaz" koşullu bir talimattır ve tam da oturum uzun ve yoğunken
+  atlanır. `Stop` hook'u, bir iş parçası (vault dışında ≥3 dosya düzenlemesi ya da ≥15 komut) günlüğe
+  bir şey yazılmadan bittiğinde Claude'dan BİR KEZ kısa özet ister ya da "günlük gerekmez" demesini
+  ister. `stop_hook_active` ile döngüye girmez; günlük yazıldıysa ya da yalnız vault bakımı yapıldıysa
+  susar. Klasörlü kasada günlük klasörünü (`Günlük / Journal / Daily`) kendisi bulur; düz kasada her
+  vault yazımı sayılır. Ayarlar: `JOURNAL_REMIND`, `JOURNAL_MIN_EDITS`, `JOURNAL_MIN_COMMANDS`,
+  `JOURNAL_DIR`. · A Stop hook asks once per stretch of real work for a session summary (or "none needed").
+- `install.sh` yeniden kurulumda `vault.conf`'a elle eklenmiş ayarları korur (v1.1 dosyayı baştan yazıp
+  siliyordu). · hand-added vault.conf settings survive a reinstall.
+- `tests/run.sh` (69 test, sahte HOME) + `.github/workflows/ci.yml`: shellcheck, JSON, LF; Ubuntu,
   macOS, Windows'ta uçtan uca. · end-to-end tests and CI on three OSes.
 - `install.sh`: `--layout`, `--core-notes`, `--no-projects`, `--disable-background-tasks`; `VERSION`
   dosyası, `~/.claude/saltay-kokpit.version`, kurulum sonunda `settings.json` JSON doğrulaması.

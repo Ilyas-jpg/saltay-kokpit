@@ -74,14 +74,14 @@ CH="$HOME/.claude"
 OUT=$(bash "$REPO/scripts/install.sh" --lang tr --vault "$HOME/vault" --projects "$HOME/projeler" --claude-home "$CH" --name "Test" 2>&1); RC=$?
 check "installer exit 0" '[ $RC -eq 0 ]' "$OUT"
 check "settings.json valid" 'valid_json "$CH/settings.json"'
-check "5 saltay hook commands" '[ "$(ncmd "$CH/settings.json" "$CH/")" = 5 ]'
+check "7 saltay hook commands" '[ "$(ncmd "$CH/settings.json" "$CH/")" = 7 ]'
 check "no env added by default" '! grep -q CLAUDE_CODE_DISABLE_BACKGROUND_TASKS "$CH/settings.json"'
 check "vault templates copied" '[ -f "$HOME/vault/kullanici_profil.md" ]'
 check "projects skeleton" '[ -d "$HOME/projeler/Aktif" ]'
 SZ=$(SALTAY_CONF="$CH/vault.conf" bash "$CH/hooks/vault-index.sh" | wc -c | tr -d ' ')
 check "index 0 < $SZ <= 9500" '[ "$SZ" -gt 0 ] && [ "$SZ" -le 9500 ]'
 bash "$REPO/scripts/install.sh" --lang tr --vault "$HOME/vault" --projects "$HOME/projeler" --claude-home "$CH" >/dev/null 2>&1
-check "re-run is idempotent (still 5)" '[ "$(ncmd "$CH/settings.json" "$CH/")" = 5 ]'
+check "re-run is idempotent (still 7)" '[ "$(ncmd "$CH/settings.json" "$CH/")" = 7 ]'
 HOUT=$(cd "$SB" && CLAUDE_HOME="$CH" SALTAY_CONF="$CH/vault.conf" bash "$REPO/scripts/vault-health.sh" 2>&1); HRC=$?
 check "vault-health: healthy" '[ $HRC -eq 0 ]' "$HOUT"
 
@@ -111,7 +111,7 @@ st.permissions={allow:["Bash(ls:*)"]};
 fs.writeFileSync(out,JSON.stringify(st,null,2));' "$SB/remove.filled.json" "$CH2/settings.json"
 bash "$REPO/scripts/install.sh" --vault "$HOME/vault" --no-projects --claude-home "$CH2" >/dev/null 2>&1
 check "old inline commands removed" '[ "$(ncmd "$CH2/settings.json" "hook-meta.sh); ")" = 0 ]'
-check "5 new commands" '[ "$(ncmd "$CH2/settings.json" "$CH2/hooks/")" -eq 4 ] && [ "$(ncmd "$CH2/settings.json" "session-reminder")" -eq 1 ]'
+check "7 new commands" '[ "$(ncmd "$CH2/settings.json" "$CH2/hooks/")" -eq 6 ] && [ "$(ncmd "$CH2/settings.json" "session-reminder")" -eq 1 ]'
 check "user hook kept" '[ "$(ncmd "$CH2/settings.json" "echo mine")" = 1 ]'
 check "permissions kept" 'grep -q "Bash(ls:\*)" "$CH2/settings.json"'
 
@@ -149,6 +149,31 @@ check "compression warning shown" 'printf "%s" "$FI" | grep -q "sikisma seviyesi
 check "binding names never trimmed (60/60)" '[ "$(printf "%s" "$FI" | grep -o "kural [0-9]*" | sort -u | wc -l | tr -d " ")" = 60 ]'
 FH=$(cd "$SB" && CLAUDE_HOME="$CH4" SALTAY_CONF="$CH4/vault.conf" bash "$REPO/scripts/vault-health.sh" 2>&1)
 check "health reports orphan notes" 'printf "%s" "$FH" | grep -q "orphan notes"' "$FH"
+
+echo "[journal reminder]"
+trk()  { printf '{"session_id":"%s","tool_name":"%s","tool_input":{"file_path":"%s"}}' "$1" "$2" "${3:-}" | bash "$CH4/hooks/session-track.sh"; }
+stopr(){ printf '{"session_id":"%s","hook_event_name":"Stop","stop_hook_active":%s}' "$1" "${2:-false}" | SALTAY_CONF="${3:-$CH4/vault.conf}" bash "$CH4/hooks/journal-reminder.sh" 2>"$SB/jr.err"; echo $?; }
+W2="$SB/work"; mkdir -p "$W2"
+trk s1 Edit "$W2/a.js"; trk s1 Write "$W2/b.js"
+check "2 edits: quiet" '[ "$(stopr s1)" = 0 ]'
+trk s1 Edit "$W2/c.js"
+check "3 edits: reminds (exit 2)" '[ "$(stopr s1)" = 2 ]'
+check "names the journal folder" 'grep -q "Hafıza/Günlük" "$SB/jr.err"' "$(cat "$SB/jr.err")"
+check "stop_hook_active: never loops" '[ "$(stopr s1 true)" = 0 ]'
+check "reminds once per stretch" '[ "$(stopr s1)" = 0 ]'
+trk s2 Edit "$W2/a.js"; trk s2 Edit "$W2/b.js"; trk s2 Edit "$W2/c.js"; trk s2 Write "$FV/Hafıza/Günlük/2026-01-02 is.md"
+check "journal written: quiet" '[ "$(stopr s2)" = 0 ]'
+i=0; while [ $i -lt 5 ]; do trk s3 Edit "$FV/Hafıza/Projeler/Ornek Musteri Sitesi.md"; i=$((i+1)); done
+check "vault upkeep is not 'work'" '[ "$(stopr s3)" = 0 ]'
+i=0; while [ $i -lt 15 ]; do trk s4 Bash; i=$((i+1)); done
+check "15 shell commands: reminds" '[ "$(stopr s4)" = 2 ]'
+cp "$CH4/vault.conf" "$SB/off.conf"; echo "JOURNAL_REMIND=0" >> "$SB/off.conf"
+trk s5 Edit "$W2/a.js"; trk s5 Edit "$W2/b.js"; trk s5 Edit "$W2/c.js"
+check "JOURNAL_REMIND=0 turns it off" '[ "$(stopr s5 false "$SB/off.conf")" = 0 ]'
+check "bad session id ignored" '[ "$(stopr "../x")" = 0 ]'
+echo "JOURNAL_MIN_EDITS=7" >> "$CH4/vault.conf"
+bash "$REPO/scripts/install.sh" --vault "$FV" --no-projects --claude-home "$CH4" >/dev/null 2>&1
+check "reinstall keeps hand-added vault.conf settings" 'grep -q "^JOURNAL_MIN_EDITS=7" "$CH4/vault.conf"'
 
 echo "[flat layout under pressure]"
 i=1; while [ $i -le 400 ]; do printf -- '---\ndescription: x\n---\n' > "$HOME/vault/proje_cok_uzun_bir_proje_adi_numara_$i.md"; i=$((i+1)); done

@@ -10,6 +10,8 @@ her düzenlemeden önce yedek al, her prompt'ta kuralları hatırlat. Model "unu
 | `backup.sh` | `PreToolUse` | Düzenlemeden ya da üzerine yazmadan önce yedek. |
 | `secret-scan.sh` | `PostToolUse` | Sabit sır arar, bulursa Claude'a bildirir (exit 2). |
 | `change-log.sh` | `PostToolUse` | Değişiklik günlüğü, 1 MB'ta döner. |
+| `session-track.sh` | `PostToolUse` | Oturum başına ne iş yapıldığını (düzenleme / komut) `~/.claude/saltay-state/` altına not eder. |
+| `journal-reminder.sh` | `Stop` | Gerçek bir iş parçası günlüğe yazılmadan bittiyse Claude'dan bir kez oturum özeti ister. |
 | `settings.hooks.json` | — | `~/.claude/settings.json`'a birleştirilecek hook bloğu (install.sh yapar). |
 | `settings.remove.json` | — | Eski sürümlerin kaydettiği ve bu sürümün yerine koyduğu komutlar; install.sh birleştirmeden önce, uninstall.sh her zaman bunları birebir eşleşmeyle kaldırır. |
 | `settings.env.json` | — | İsteğe bağlı env bloğu; yalnız `install.sh --disable-background-tasks` ile. |
@@ -23,6 +25,12 @@ her düzenlemeden önce yedek al, her prompt'ta kuralları hatırlat. Model "unu
 | `PreToolUse` | `Edit\|MultiEdit\|Write` | `backup.sh`: var olan dosyanın `<ad>.<yol-checksum>.<zaman>.bak` kopyası. Dosya bir git reposundaysa `<repo kökü>/.backups/`, değilse `~/.claude/saltay-backups/` (sabit klasör için `vault.conf`'ta `SALTAY_BACKUP_DIR`). Her yedek klasörü ilk açılışta kendi `.gitignore`'unu (`*`) yazar. Hiçbir şey silinmez. |
 | `PostToolUse` | `Edit\|MultiEdit\|Write` | `secret-scan.sh`: `password/api_key/... = "…"` ya da `"api_key": "…"` atamaları ve bilinen anahtar biçimleri (`sk-ant-`, `ghp_`, `AKIA`, `PRIVATE KEY` …). Bulursa satır numarasını (değeri değil) **exit 2** ile Claude'a verir; Claude değeri env'e taşır. `.env` ve `*.example` atlanır; kasıtlı sahte anahtar içeren satıra `saltay:allow` yaz. |
 | `PostToolUse` | `Edit\|MultiEdit\|Write` | `change-log.sh`: `~/.claude/changes.log`'a `[zaman] Araç yol`; 1 MB'ta `changes.<tarih>.log` olur. |
+| `PostToolUse` | `Edit\|MultiEdit\|Write\|NotebookEdit\|Bash` | `session-track.sh`: `saltay-state/<oturum>.log`'a `E <yol>` ya da `B` satırı. Her komuttan sonra çalıştığı için alt süreç açmaz. |
+| `Stop` | — | `journal-reminder.sh`: son sıfırlama noktasından beri vault dışında ≥`JOURNAL_MIN_EDITS` (3) düzenleme ya da ≥`JOURNAL_MIN_COMMANDS` (15) komut varsa ve günlüğe (klasörlü kasada `Günlük/Journal/Daily` klasörü, düz kasada vault'un tamamı) hiçbir şey yazılmadıysa **exit 2** ile Claude'dan kısa oturum özeti ya da "günlük gerekmez" ister, sonra sıfırlar. `stop_hook_active` doluysa susar (döngü yok). Kapatmak: `vault.conf`'ta `JOURNAL_REMIND=0`. |
+
+> **Neden `Stop`, neden `SessionEnd` değil:** `SessionEnd` çalıştığında oturum bitmiştir, Claude'a bir şey
+> yaptırılamaz. `Stop` her cevabın sonunda tetiklenir; hatırlatıcı bu yüzden eşik ve sıfırlama noktasıyla
+> çalışır: iş parçası başına bir kez, yalnız gerçek iş olduysa.
 
 > v1.1'e kadar stderr + exit 0 ile basılan sır uyarısı **modele hiç ulaşmıyordu**: Claude Code exit 0'daki
 > stderr'i yalnız transcript'te gösterir. Modelin görmesi gereken her hook mesajı exit 2 (ya da JSON

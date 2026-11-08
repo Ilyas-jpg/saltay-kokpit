@@ -231,6 +231,8 @@ saltay-kokpit/
 │   ├── backup.sh                PreToolUse: backup before Edit/Write (.backups/ hides itself from git)
 │   ├── secret-scan.sh           PostToolUse: hardcoded secret → tells Claude (exit 2)
 │   ├── change-log.sh            PostToolUse: changes.log (rotated at 1 MB)
+│   ├── session-track.sh         PostToolUse: per-session work record (for the journal reminder)
+│   ├── journal-reminder.sh      Stop: asks once for a summary when work ends unjournaled
 │   ├── settings.hooks.json      block merged into settings.json
 │   ├── settings.remove.json     older releases' commands (removed on upgrade)
 │   ├── settings.env.json        optional env (--disable-background-tasks)
@@ -271,7 +273,7 @@ publishing, domains: stop, ask. "You have full authority" does not lift red.
 The hook groups names by prefix; `feedback_` names are never trimmed at any compression level.
 
 **Hooks:** `SessionStart` index · `UserPromptSubmit` short reminder (~500 B) · `PreToolUse` backup ·
-`PostToolUse` secret scan + change log.
+`PostToolUse` secret scan + change log · `Stop` journal reminder (once, when a stretch of work ends with nothing journaled).
 
 ## Lessons from real failures
 

@@ -237,6 +237,8 @@ saltay-kokpit/
 │   ├── backup.sh                PreToolUse: Edit/Write öncesi yedek (.backups/ kendini git'ten saklar)
 │   ├── secret-scan.sh           PostToolUse: sabit sır → Claude'a bildirir (exit 2)
 │   ├── change-log.sh            PostToolUse: changes.log (1 MB'ta döner)
+│   ├── session-track.sh         PostToolUse: oturum başına iş kaydı (günlük hatırlatıcı için)
+│   ├── journal-reminder.sh      Stop: iş günlüğe yazılmadan bittiyse bir kez özet ister
 │   ├── settings.hooks.json      settings.json'a birleştirilecek blok
 │   ├── settings.remove.json     eski sürümlerin komutları (yükseltmede kaldırılır)
 │   ├── settings.env.json        isteğe bağlı env (--disable-background-tasks)
@@ -277,7 +279,7 @@ mesajda 5-8 paralel arama; büyük işte süre sınırı ve tahmini süre.
 Hook adları prefix'e göre bölümler; `feedback_` adları hiçbir sıkışma seviyesinde kırpılmaz.
 
 **Hook'lar:** `SessionStart` index · `UserPromptSubmit` kısa hatırlatma (~500 B) · `PreToolUse` yedek ·
-`PostToolUse` sır tarama + değişiklik logu.
+`PostToolUse` sır tarama + değişiklik logu · `Stop` günlük hatırlatıcı (iş parçası günlüğe yazılmadan bittiyse, bir kez).
 
 ## Gerçek hatalardan çıkan dersler
 

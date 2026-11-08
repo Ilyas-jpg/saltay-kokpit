@@ -55,6 +55,7 @@ fi
 
 say "[2/2] files"
 for f in hooks/vault-index.sh hooks/hook-meta.sh hooks/backup.sh hooks/secret-scan.sh hooks/change-log.sh \
+         hooks/session-track.sh hooks/journal-reminder.sh \
          vault.conf session-reminder.json saltay-kokpit.version; do
   retire "$CLAUDE_HOME/$f"
 done

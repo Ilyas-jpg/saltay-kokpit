@@ -203,13 +203,15 @@ fi
 # ------------------------------------------------------------------ 3. hooks
 say "[3/6] hooks"
 run mkdir -p "$CLAUDE_HOME/hooks"
-for h in vault-index.sh hook-meta.sh backup.sh secret-scan.sh change-log.sh; do
+for h in vault-index.sh hook-meta.sh backup.sh secret-scan.sh change-log.sh session-track.sh journal-reminder.sh; do
   backup_if_exists "$CLAUDE_HOME/hooks/$h"
   run cp "$REPO_DIR/hooks/$h" "$CLAUDE_HOME/hooks/$h"
   run chmod +x "$CLAUDE_HOME/hooks/$h"
   say "  install: hooks/$h"
 done
 
+OLD_CONF=""
+[ -f "$CLAUDE_HOME/vault.conf" ] && OLD_CONF="$CLAUDE_HOME/vault.conf.$TS.bak"
 backup_if_exists "$CLAUDE_HOME/vault.conf"
 if [ "$DRY" -eq 0 ]; then
   {
@@ -228,6 +230,18 @@ if [ "$DRY" -eq 0 ]; then
       echo '# PROJECT_MOC="Memory/Projects/Projects MOC"'
     else
       echo '# CORE="..."   # optional: override the notes that get a description in the index'
+    fi
+    echo "# journal reminder (Stop hook) — see hooks/journal-reminder.sh"
+    echo '# JOURNAL_REMIND=0          # turn it off'
+    echo '# JOURNAL_MIN_EDITS=3       # file edits outside the vault'
+    echo '# JOURNAL_MIN_COMMANDS=15   # shell commands'
+    echo '# JOURNAL_DIR="Memory/Journal"'
+    # settings the user added by hand survive a reinstall (v1.1 rewrote the file and lost them)
+    if [ -n "$OLD_CONF" ] && [ -f "$OLD_CONF" ]; then
+      skip="VAULT_DIR|PROJECTS_DIR|VAULT_LANG|VAULT_LAYOUT|BUDGET"
+      [ -n "$CORE_NOTES" ] && skip="$skip|CORE_NOTES"
+      kept=$(grep -E '^[A-Z_]+=' "$OLD_CONF" | grep -vE "^($skip)=" || true)
+      if [ -n "$kept" ]; then echo "# kept from the previous vault.conf"; printf '%s\n' "$kept"; fi
     fi
   } > "$CLAUDE_HOME/vault.conf"
 fi
