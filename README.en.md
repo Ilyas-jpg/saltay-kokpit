@@ -149,14 +149,33 @@ The installer is idempotent: it never overwrites without a timestamped backup. T
 
 | Step | Target |
 |---|---|
-| Vault templates | `~/Documents/ClaudeVault/` (existing notes untouched) |
-| Projects folder skeleton | `~/Desktop/00-Projects/{Active,Archive,_tools,_backups}` |
+| Vault templates | `Documents/ClaudeVault/` (existing notes untouched; no templates at all for a folders vault) |
+| Projects folder skeleton | `Desktop/00-Projects/{Active,Archive,_tools,_backups}` (the real Desktop, OneDrive-redirected included) |
 | Hooks, `vault.conf`, reminder | `~/.claude/hooks/`, `~/.claude/vault.conf`, `~/.claude/session-reminder.json` |
 | Constitution | `~/.claude/CLAUDE.md`; **left alone if it exists**, `CLAUDE.saltay.md` written next to it |
-| Hook registration | merged into `~/.claude/settings.json` (backup taken, no duplicate commands) |
-| Verification | index size and stdin JSON test |
+| Hook registration | merged into `~/.claude/settings.json` (backup taken, no duplicate commands, older releases' commands removed) |
+| Verification | index size, stdin JSON test, `settings.json` validity |
 
-Options: `--lang tr` · `--vault DIR` · `--projects DIR` · `--claude-home DIR` · `--dry-run`.
+Options: `--lang tr` · `--vault DIR` · `--layout auto|flat|folders` · `--core-notes "A;B/C"` ·
+`--projects DIR` · `--no-projects` · `--claude-home DIR` · `--disable-background-tasks` · `--dry-run`.
+
+**Already have an Obsidian vault?** An existing vault organised in sub-folders (e.g. `Memory/Feedback`,
+`Memory/Projects`, `Journal`) can be used as it is: no templates are copied, no note is changed. The
+installer detects the layout:
+
+```bash
+bash scripts/install.sh --lang en --vault "C:/Obsidian/MyVault" --core-notes "Home;Memory/Memory Rules" --no-projects
+```
+
+The index arrives folder by folder (newest note first, frontmatter `summary:` as the description).
+Folders named `feedback / rules` are binding and never trimmed; template folders are skipped, `archive/`
+folders are only counted. Settings live in `~/.claude/vault.conf` (`CORE_NOTES`, `BINDING_DIRS`, `EXCLUDE_DIRS`).
+
+Uninstall (reversible; vault and `CLAUDE.md` untouched):
+
+```bash
+bash scripts/uninstall.sh
+```
 
 Then: restart Claude Code; the index should arrive at session start. Open the vault in Obsidian
 with *Open folder as vault*. Fill `user_profile.md`, or just tell Claude in the first session and it writes it.
@@ -187,6 +206,10 @@ notes are never overwritten: the new constitution is written to `CLAUDE.saltay.m
 templates are added, and templates in your vault that still carry the v1.0 text are listed at the end
 (compare them by hand).
 
+Upgrading from v1.1 is the same command: the old unquoted and inline hook commands are removed by exact
+match and replaced by calls to `hooks/*.sh`. The `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` value v1.1 added
+silently stays where it is.
+
 ## Repository layout
 
 ```
@@ -203,17 +226,24 @@ saltay-kokpit/
 │   ├── project/launch.json.example         Browser pane dev-server registry
 │   └── auto-memory-redirect.md             redirect for Claude Code's own memory folder
 ├── hooks/
-│   ├── vault-index.sh           SessionStart: self-measuring index (levels 0-5 + failsafe)
+│   ├── vault-index.sh           SessionStart: self-measuring index (flat/folders, levels 0-5 + failsafe)
 │   ├── hook-meta.sh             stdin JSON → tool_name|file_path
+│   ├── backup.sh                PreToolUse: backup before Edit/Write (.backups/ hides itself from git)
+│   ├── secret-scan.sh           PostToolUse: hardcoded secret → tells Claude (exit 2)
+│   ├── change-log.sh            PostToolUse: changes.log (rotated at 1 MB)
 │   ├── settings.hooks.json      block merged into settings.json
-│   ├── settings.remove.json     an older release's commands (removed on upgrade)
+│   ├── settings.remove.json     older releases' commands (removed on upgrade)
+│   ├── settings.env.json        optional env (--disable-background-tasks)
 │   └── README.md                hook table + optional hooks (TR)
 ├── scripts/
 │   ├── install.sh · install.ps1 installer (idempotent)
-│   ├── vault-health.sh          health check
+│   ├── uninstall.sh             uninstaller (reversible)
+│   ├── vault-health.sh          health check (orphan notes included)
 │   ├── new-project.sh           Active/<name> + .gitignore + git + vault note + MEMORY line
 │   ├── archive-project.sh       Active → Archive (reversible) + vault status + decision entry
-│   └── merge-settings.js/.py    settings.json merger
+│   ├── lib.sh                   shared helpers (Turkish-safe slugs)
+│   └── merge-settings.js/.py    settings.json merger / remover
+├── tests/run.sh                 end-to-end tests in a sandboxed HOME (CI: Ubuntu, macOS, Windows)
 └── assets/                      banner
 ```
 

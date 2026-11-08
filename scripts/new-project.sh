@@ -20,7 +20,11 @@ NAME="${1:-}"; DESC=""
 [ -n "$NAME" ] || { echo "usage: new-project.sh <name> [--desc \"one line\"]"; exit 1; }
 shift
 while [ $# -gt 0 ]; do case "$1" in --desc) DESC="$2"; shift 2 ;; *) shift ;; esac; done
-SLUG=$(printf '%s' "$NAME" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//')
+# shellcheck source=lib.sh
+. "$REPO_DIR/scripts/lib.sh"
+[ -n "${PROJECTS_DIR:-}" ] || { echo "projects folder is not configured (installed with --no-projects). Re-run install.sh with --projects DIR."; exit 1; }
+SLUG=$(slugify "$NAME")
+[ -n "$SLUG" ] || { echo "cannot build a folder name from \"$NAME\" — use letters or digits"; exit 1; }
 KEY=$(printf '%s' "$SLUG" | tr '-' '_')
 TODAY=$(date +%Y-%m-%d)
 
@@ -38,15 +42,36 @@ printf '# %s\n\n%s\n' "$NAME" "${DESC:-}" > "$DIR/README.md"
 if command -v git >/dev/null 2>&1; then (cd "$DIR" && git init -q && git add . && git commit -qm "chore: bootstrap $SLUG (saltay-kokpit)" >/dev/null 2>&1 || true); fi
 echo "project : $DIR"
 
+# ---- folders layout (v1.2): human-readable note in PROJECT_NOTES_DIR + link in PROJECT_MOC
+if [ "${VAULT_LAYOUT:-flat}" = "folders" ]; then
+  NDIR="$VAULT_DIR/${PROJECT_NOTES_DIR:-.}"
+  NOTE="$NDIR/$NAME.md"
+  if [ -e "$NOTE" ]; then
+    echo "note    : $NOTE exists — not touched"
+  else
+    mkdir -p "$NDIR"
+    printf -- '---\ntype: %s\ntags: [%s]\ncreated: %s\nupdated: %s\nsummary: %s\nstatus: active\n---\n# %s\n\n%s\n\n- %s: `%s`\n' \
+      "${PFX%_}" "${PFX%_}" "$TODAY" "$TODAY" "${DESC:-$FILL}" "$NAME" "${DESC:-$FILL}" "${ACTIVE}" "$DIR" > "$NOTE"
+    echo "note    : $NOTE"
+  fi
+  if [ -n "${PROJECT_MOC:-}" ]; then
+    MOC="$VAULT_DIR/$PROJECT_MOC.md"
+    if grep -qF "[[$NAME]]" "$MOC" 2>/dev/null; then echo "MOC     : link exists"
+    else printf -- '- [[%s]] — %s (%s)\n' "$NAME" "${DESC:-$FILL}" "$TODAY" >> "$MOC"; echo "MOC     : link added to $PROJECT_MOC"; fi
+  fi
+  exit 0
+fi
+
 NOTE="$VAULT_DIR/$PFX$KEY.md"
 if [ -e "$NOTE" ]; then
   echo "note    : $NOTE exists — not touched"
 else
-  sed -e "s|<Proje adı>|$NAME|g; s|<Project name>|$NAME|g" \
-      -e "s|<tek cümle ne>|${DESC:-…}|g; s|<one sentence what>|${DESC:-…}|g" \
+  eN=$(sed_escape "$NAME"); eD=$(sed_escape "${DESC:-…}"); eP=$(sed_escape "$PROJECTS_DIR")
+  sed -e "s|<Proje adı>|$eN|g; s|<Project name>|$eN|g" \
+      -e "s|<tek cümle ne>|$eD|g; s|<one sentence what>|$eD|g" \
       -e "s|YYYY-MM-DD|$TODAY|g" \
       -e "s|<klasör>|$SLUG|g; s|<folder>|$SLUG|g" \
-      -e "s|{{PROJECTS_DIR}}|$PROJECTS_DIR|g" "$TPL" > "$NOTE"
+      -e "s|{{PROJECTS_DIR}}|$eP|g" "$TPL" > "$NOTE"
   if [ -n "$DESC" ]; then
     awk -v d="$DESC" 'BEGIN{done=0} /^description:/ && !done {print "description: " d; done=1; next} {print}' "$NOTE" > "$NOTE.tmp" && mv "$NOTE.tmp" "$NOTE"
   fi

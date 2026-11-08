@@ -19,7 +19,11 @@ NAME="${1:-}"; REASON=""
 [ -n "$NAME" ] || { echo "usage: archive-project.sh <name> [--reason \"why\"]"; exit 1; }
 shift
 while [ $# -gt 0 ]; do case "$1" in --reason) REASON="$2"; shift 2 ;; *) shift ;; esac; done
-SLUG=$(printf '%s' "$NAME" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//')
+# shellcheck source=lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+[ -n "${PROJECTS_DIR:-}" ] || { echo "projects folder is not configured (installed with --no-projects). Re-run install.sh with --projects DIR."; exit 1; }
+SLUG=$(slugify "$NAME")
+[ -n "$SLUG" ] || { echo "cannot build a folder name from \"$NAME\""; exit 1; }
 KEY=$(printf '%s' "$SLUG" | tr '-' '_')
 TODAY=$(date +%Y-%m-%d)
 
@@ -40,7 +44,13 @@ else
   echo "folder  : $SRC not found (vault only)"
 fi
 
-NOTE="$VAULT_DIR/$PFX$KEY.md"
+NOTE="$VAULT_DIR/$PFX$KEY.md"; MEM="$VAULT_DIR/MEMORY.md"; LINK="$PFX$KEY"
+if [ "${VAULT_LAYOUT:-flat}" = "folders" ]; then
+  # v1.2 folders layout: note named after the project, link lives in PROJECT_MOC
+  NOTE="$VAULT_DIR/${PROJECT_NOTES_DIR:-.}/$NAME.md"; LINK="$NAME"
+  MEM="$VAULT_DIR/${PROJECT_MOC:-MEMORY}.md"
+  DEC="$VAULT_DIR/${DECISIONS_NOTE:-__none__}.md"
+fi
 if [ -f "$NOTE" ]; then
   if grep -q '^status:' "$NOTE"; then
     awk '/^status:/ && !d {print "status: archived"; d=1; next} {print}' "$NOTE" > "$NOTE.tmp" && mv "$NOTE.tmp" "$NOTE"
@@ -53,10 +63,9 @@ else
   echo "note    : $NOTE not found"
 fi
 
-MEM="$VAULT_DIR/MEMORY.md"
-if [ -f "$MEM" ] && grep -q "\[\[$PFX$KEY\]\]" "$MEM"; then
-  sed -i.tmp "s/^- \[\[$PFX$KEY\]\]/- 📦 [[$PFX$KEY]]/" "$MEM" && rm -f "$MEM.tmp"
-  echo "MEMORY  : 📦 marker set"
+if [ -f "$MEM" ] && grep -qF "[[$LINK]]" "$MEM"; then
+  awk -v l="- [[$LINK]]" 'index($0, l) == 1 && !d { $0 = "- 📦 " substr($0, 3); d = 1 } {print}' "$MEM" > "$MEM.tmp" && mv "$MEM.tmp" "$MEM"
+  echo "$(basename "$MEM" .md): 📦 marker set"
 fi
 
 if [ -f "$DEC" ]; then

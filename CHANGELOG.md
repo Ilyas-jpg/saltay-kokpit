@@ -5,7 +5,64 @@ Format follows Keep a Changelog; versions follow SemVer.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-09
+
+Hata düzeltmeleri, klasörlü Obsidian kasası desteği, kaldırma betiği ve CI. · Bug fixes, support for
+existing folder-based Obsidian vaults, an uninstaller and CI.
+
+### Düzeltildi · Fixed
+- **Sır tarayıcı / Secret scan** (`hooks/secret-scan.sh`): uyarı stderr + exit 0 ile basılıyordu, Claude
+  Code bunu modele göstermez; artık exit 2 ile Claude'a gider. Regex'teki `\x27` grep'te tek tırnak değil
+  `\ x 2 7` karakterleriydi: tek tırnaklı değerler, `"key": "value"` (JSON/YAML) ve içinde x/2/7 geçen
+  değerler kaçıyordu. Bilinen anahtar biçimleri eklendi (`sk-ant-`, `sk-`, `ghp_`, `AKIA`, `AIza`, `xox?-`,
+  `PRIVATE KEY`); değer asla yazdırılmaz, yalnız satır no. · The warning never reached the model (stderr
+  + exit 0); now exit 2. `\x27` inside a grep bracket matched `\ x 2 7`, not a quote. Known token formats
+  added; the value itself is never printed.
+- **Yedek / Backup** (`hooks/backup.sh`): `Write` ile bir dosyanın tamamen ezilmesi yedeklenmiyordu
+  (matcher yalnız `Edit|MultiEdit`). Aynı adlı farklı klasördeki dosyalar artık çakışmaz (yol checksum'ı);
+  `.backups/` kendi `.gitignore`'unu (`*`) yazar, kopyalanan bir `.env` commit'lenemez. · `Write` over an
+  existing file is now backed up; same-name files no longer collide; `.backups/` ignores itself in git.
+- **Boşluklu yol / Paths with spaces:** `settings.json`'a yazılan hook komutlarında yol tırnaksızdı;
+  `C:\Users\John Doe` gibi bir ev klasöründe bütün hook'lar bozuluyordu. · Hook commands quote the path.
+- **Türkçe proje adları / Turkish names** (`scripts/lib.sh`): "Şirket Sitesi" → `irket-sitesi` oluyordu;
+  artık `sirket-sitesi`. `&` ve `|` içeren açıklamalar not şablonunu bozmuyor. · Transliteration before slugging.
+- **OneDrive Masaüstü / Desktop:** varsayılan proje klasörü `$HOME/Desktop` yerine gerçek Masaüstü
+  (`cygpath -D`, `xdg-user-dir`, OneDrive); Masaüstü OneDrive'a taşınmış makinede görünmeyen bir klasör
+  açılıyordu. Vault varsayılanı da gerçek Belgeler klasörü. · The real Desktop/Documents folder is used.
+- `vault-health.sh`: `.backups/` kontrolü vault klasöründe yapılıyordu (önce `cd`); artık çalıştırıldığı
+  klasörde. · checked inside the vault by mistake.
+- `hook-meta.sh`: açgözlü sed satırdaki SON `file_path`'i alıyordu; artık ilkini (varsa `jq`).
+  · now takes the first match (jq when available).
+- `install.sh`: `eval` + tek tırnak yerine argv (`'` içeren yollar), eksik seçenek değeri net hata,
+  `vault.conf` güvenli tırnaklama. · no eval; missing option values fail clearly.
+- Index metni "credential yaz" diyordu, anayasa "sır parola yöneticisinde" diyor; metin "hesap
+  işaretçisi, sır ASLA" oldu. · The index no longer tells the model to write credentials.
+
+### Eklendi · Added
+- **Klasörlü kasa / Folders layout** (`VAULT_LAYOUT=folders`): alt klasörlerle düzenlenmiş mevcut bir
+  Obsidian kasası olduğu gibi kullanılır; şablon kopyalanmaz. Index klasör klasör, en yeni üstte,
+  frontmatter `summary:` açıklama olur; `Geri Bildirim / feedback / kural` klasörleri bağlayıcıdır ve
+  hiç kısaltılmaz; şablon klasörleri dışarıda, `arsiv/` sayılır. 0-5 sıkışma seviyeleri ve 10K garantisi
+  aynı. `install.sh` düzeni kendisi tanır (`--layout auto`). · Use an existing sub-folder vault as is.
+- `scripts/uninstall.sh` (+ `install.ps1 -Uninstall`): bütün saltay hook komutları (eski sürümler dahil)
+  birebir eşleşmeyle çıkar, dosyalar `.bak` olur; vault, CLAUDE.md, env dokunulmaz. · reversible uninstall.
+- `tests/run.sh` (55 test, sahte HOME) + `.github/workflows/ci.yml`: shellcheck, JSON, LF; Ubuntu,
+  macOS, Windows'ta uçtan uca. · end-to-end tests and CI on three OSes.
+- `install.sh`: `--layout`, `--core-notes`, `--no-projects`, `--disable-background-tasks`; `VERSION`
+  dosyası, `~/.claude/saltay-kokpit.version`, kurulum sonunda `settings.json` JSON doğrulaması.
+- `vault-health.sh`: klasörlü kasada klasör başı sayım, `summary` eksikleri, **yetim notlar** (hiçbir
+  `[[link]]`in göstermediği), `settings.json` geçerliliği, hook dosyaları, sır tarayıcı öz-testi,
+  `.backups/` boyutu. · orphan notes, JSON validity, secret-scan self-test.
+- `changes.log` 1 MB'ta döner (`changes.<tarih>.log`), silinmez. · rotated at 1 MB, never deleted.
+
 ### Değişti · Changed
+- `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` artık sessizce eklenmiyor; `--disable-background-tasks` ile
+  isteğe bağlı (`hooks/settings.env.json`). Yükseltmede var olan değer korunur. · env is opt-in.
+- Satır içi hook komutları `hooks/backup.sh`, `secret-scan.sh`, `change-log.sh` dosyalarına taşındı
+  (okunur, test edilir); her hook'a `timeout`. v1.1 komutları yükseltmede otomatik kaldırılır.
+- `merge-settings.js/.py`: `--home` (yer tutucu JSON ayrıştırıldıktan sonra değişir), `--uninstall`,
+  dosya yoksa oluşturur, atomik yazar, BOM'u tolere eder.
+- Index'teki konum Windows'ta `C:\...` biçiminde gösterilir (Read aracının beklediği yol).
 - `SECURITY.md`, `CODE_OF_CONDUCT.md`: güvenlik ve davranış bildirimleri yalnız GitHub'ın özel zafiyet
   bildirimiyle alınır; e-posta adresi kaldırıldı · security and conduct reports go only through GitHub
   private vulnerability reporting; the email address was removed.

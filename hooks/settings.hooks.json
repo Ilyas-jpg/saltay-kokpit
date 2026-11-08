@@ -1,15 +1,13 @@
 {
-  "_comment": "saltay-kokpit hook block. scripts/install.sh merges this into ~/.claude/settings.json and replaces __CLAUDE_HOME__ with the real path (e.g. /c/Users/you/.claude). All commands run under bash — on Windows that is Git Bash, which Claude Code already requires. Commands an older release registered and this one replaces are listed in settings.remove.json.",
-  "env": {
-    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
-  },
+  "_comment": "saltay-kokpit hook block. scripts/install.sh merges this into ~/.claude/settings.json and replaces __CLAUDE_HOME__ with the real path (e.g. /c/Users/you/.claude). Paths are quoted so a home folder with spaces works. All commands run under bash — on Windows that is Git Bash, which Claude Code already requires. Commands an older release registered and this one replaces are listed in settings.remove.json; the optional env block lives in settings.env.json (install.sh --disable-background-tasks).",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash __CLAUDE_HOME__/hooks/vault-index.sh"
+            "command": "bash \"__CLAUDE_HOME__/hooks/vault-index.sh\"",
+            "timeout": 20
           }
         ]
       }
@@ -19,38 +17,37 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat __CLAUDE_HOME__/session-reminder.json"
+            "command": "cat \"__CLAUDE_HOME__/session-reminder.json\"",
+            "timeout": 5
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit",
+        "matcher": "Edit|MultiEdit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); f=${m#*|}; if [[ -n \"$f\" && -f \"$f\" ]]; then mkdir -p .backups && cp \"$f\" \".backups/$(basename \"$f\").$(date +%Y%m%d_%H%M%S).bak\"; fi"
+            "command": "bash \"__CLAUDE_HOME__/hooks/backup.sh\"",
+            "timeout": 10
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); f=${m#*|}; if [ -n \"$f\" ] && grep -qE '(password|secret|api_?key|access_?token|private_?key)\\s*=\\s*[\"\\x27][^\"\\x27]{8,}' \"$f\" 2>/dev/null; then echo \"⚠️  Possible hardcoded secret in $f\" >&2; fi"
-          }
-        ]
-      },
-      {
         "matcher": "Edit|MultiEdit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); echo \"[$(date '+%Y-%m-%d %H:%M:%S')] ${m%%|*} ${m#*|}\" >> __CLAUDE_HOME__/changes.log"
+            "command": "bash \"__CLAUDE_HOME__/hooks/secret-scan.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"__CLAUDE_HOME__/hooks/change-log.sh\"",
+            "timeout": 10
           }
         ]
       }

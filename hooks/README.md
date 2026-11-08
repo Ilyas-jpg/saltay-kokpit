@@ -5,20 +5,28 @@ her düzenlemeden önce yedek al, her prompt'ta kuralları hatırlat. Model "unu
 
 | Dosya | Olay | Ne yapar |
 |---|---|---|
-| `vault-index.sh` | `SessionStart` | Vault index'ini (not adları) her oturuma enjekte eder. Kendini ölçer, 10K sınırına asla ulaşmaz. |
-| `hook-meta.sh` | (yardımcı) | Diğer hook'lara stdin JSON'dan `tool_name|file_path` verir. |
+| `vault-index.sh` | `SessionStart` | Vault index'ini (not adları) her oturuma enjekte eder. Kendini ölçer, 10K sınırına asla ulaşmaz. Düz (`flat`, önekli notlar) ve klasörlü (`folders`, mevcut Obsidian kasası) düzeni okur. |
+| `hook-meta.sh` | (yardımcı) | Diğer hook'lara stdin JSON'dan `tool_name|file_path` verir (`jq` varsa onunla). |
+| `backup.sh` | `PreToolUse` | Düzenlemeden ya da üzerine yazmadan önce yedek. |
+| `secret-scan.sh` | `PostToolUse` | Sabit sır arar, bulursa Claude'a bildirir (exit 2). |
+| `change-log.sh` | `PostToolUse` | Değişiklik günlüğü, 1 MB'ta döner. |
 | `settings.hooks.json` | — | `~/.claude/settings.json`'a birleştirilecek hook bloğu (install.sh yapar). |
-| `settings.remove.json` | — | Eski bir sürümün kaydettiği ve bu sürümün yerine koyduğu komutlar; install.sh birleştirmeden önce bunları birebir eşleşmeyle kaldırır. |
+| `settings.remove.json` | — | Eski sürümlerin kaydettiği ve bu sürümün yerine koyduğu komutlar; install.sh birleştirmeden önce, uninstall.sh her zaman bunları birebir eşleşmeyle kaldırır. |
+| `settings.env.json` | — | İsteğe bağlı env bloğu; yalnız `install.sh --disable-background-tasks` ile. |
 
-`settings.hooks.json` içindeki hook'lar:
+`settings.hooks.json` içindeki hook'lar (yollar tırnaklı; boşluklu ev klasörü çalışır):
 
 | Olay | Eşleşme | İş |
 |---|---|---|
 | `SessionStart` | — | `vault-index.sh` |
-| `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) her prompt'a ekler: vault'a bak ve yaz, brief'in son paragrafını tut, kırmızı dışında izin sorma. Uzun oturumda context sıkıştırılsa bile geri gelir. v1.0'daki iki uzun hatırlatmanın (1,7 KB) yerini aldı. |
-| `PreToolUse` | `Edit\|MultiEdit` | Dosyayı düzenlemeden önce `./.backups/<ad>.<zaman>.bak` kopyası alır (cwd'ye göre). |
-| `PostToolUse` | `Edit\|Write` | Dosyada `password = "…"` biçiminde sabit sır arar, bulursa stderr'e uyarı basar. |
-| `PostToolUse` | `Edit\|MultiEdit\|Write` | `~/.claude/changes.log`'a `[zaman] Araç yol` satırı ekler. |
+| `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) her prompt'a ekler: vault'a bak ve yaz, brief'in son paragrafını tut, kırmızı dışında izin sorma. Uzun oturumda context sıkıştırılsa bile geri gelir. Klasörlü kasada `session-reminder.folders.json` kurulur (MOC'a link ekle). |
+| `PreToolUse` | `Edit\|MultiEdit\|Write` | `backup.sh`: var olan dosyanın `./.backups/<ad>.<yol-checksum>.<zaman>.bak` kopyası (cwd'ye göre). `.backups/` ilk açılışta kendi `.gitignore`'unu (`*`) yazar. Hiçbir şey silinmez. |
+| `PostToolUse` | `Edit\|MultiEdit\|Write` | `secret-scan.sh`: `password/api_key/... = "…"` ya da `"api_key": "…"` atamaları ve bilinen anahtar biçimleri (`sk-ant-`, `ghp_`, `AKIA`, `PRIVATE KEY` …). Bulursa satır numarasını (değeri değil) **exit 2** ile Claude'a verir; Claude değeri env'e taşır. `.env` ve `*.example` atlanır. |
+| `PostToolUse` | `Edit\|MultiEdit\|Write` | `change-log.sh`: `~/.claude/changes.log`'a `[zaman] Araç yol`; 1 MB'ta `changes.<tarih>.log` olur. |
+
+> v1.1'e kadar stderr + exit 0 ile basılan sır uyarısı **modele hiç ulaşmıyordu**: Claude Code exit 0'daki
+> stderr'i yalnız transcript'te gösterir. Modelin görmesi gereken her hook mesajı exit 2 (ya da JSON
+> `additionalContext`) ile verilmeli.
 
 ## İsteğe bağlı hook'lar (varsayılan kurulumda YOK)
 
