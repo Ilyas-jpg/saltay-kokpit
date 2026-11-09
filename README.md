@@ -146,14 +146,34 @@ istersen `--dry-run`.
 
 | Adım | Hedef |
 |---|---|
-| Vault şablonları | `~/Documents/ClaudeVault/` (var olan notlara dokunmaz) |
-| Proje klasörü iskeleti | `~/Desktop/00-Projeler/{Aktif,Arsiv,_araclar,_yedekler}` |
+| Vault şablonları | `Belgeler/ClaudeVault/` (var olan notlara dokunmaz; klasörlü kasada hiç şablon kopyalanmaz) |
+| Proje klasörü iskeleti | `Masaüstü/00-Projeler/{Aktif,Arsiv,_araclar,_yedekler}` (OneDrive'a taşınmış Masaüstü dahil gerçek Masaüstü) |
 | Hook'lar, `vault.conf`, hatırlatıcı | `~/.claude/hooks/`, `~/.claude/vault.conf`, `~/.claude/session-reminder.json` |
 | Anayasa | `~/.claude/CLAUDE.md`; **varsa dokunmaz**, yanına `CLAUDE.saltay.md` yazar |
-| Hook kaydı | `~/.claude/settings.json`'a birleştirir (yedek alır, aynı komutu iki kez eklemez) |
-| Doğrulama | index boyutu ve stdin JSON testi |
+| Hook kaydı | `~/.claude/settings.json`'a birleştirir (yedek alır, aynı komutu iki kez eklemez, eski sürüm komutlarını çıkarır) |
+| Doğrulama | index boyutu, stdin JSON testi, `settings.json` geçerliliği |
 
-Seçenekler: `--lang en` · `--vault DIR` · `--projects DIR` · `--claude-home DIR` · `--dry-run`.
+Seçenekler: `--lang en` · `--vault DIR` · `--layout auto|flat|folders` · `--core-notes "A;B/C"` ·
+`--projects DIR` · `--no-projects` · `--claude-home DIR` · `--disable-background-tasks` · `--dry-run`.
+
+**Zaten bir Obsidian kasan var mı?** Alt klasörlerle düzenlenmiş mevcut bir kasayı (ör. `Hafıza/Geri
+Bildirim`, `Hafıza/Projeler`, `Günlük`) olduğu gibi kullanabilirsin; şablon kopyalanmaz, hiçbir not
+değişmez. Kurulum düzeni kendisi tanır:
+
+```bash
+bash scripts/install.sh --vault "C:/Obsidian/Kasam" --core-notes "Ana Sayfa;Hafıza/Hafıza Kuralları" --no-projects
+```
+
+Index klasör klasör gelir (en yeni not üstte, frontmatter `summary:` açıklama olur). Adında
+`geri bildirim / feedback / kural` geçen klasörler bağlayıcıdır ve hiç kısaltılmaz; şablon klasörleri
+atlanır, `arsiv/` klasörleri yalnız sayılır. Ayarlar `~/.claude/vault.conf` içinde (`CORE_NOTES`,
+`BINDING_DIRS`, `EXCLUDE_DIRS`).
+
+Kaldırmak (geri alınabilir; vault ve `CLAUDE.md` dokunulmaz):
+
+```bash
+bash scripts/uninstall.sh
+```
 
 Sonra: Claude Code'u yeniden başlat; oturum başında index gelmeli. Obsidian'da *Open folder as
 vault* ile vault'u aç. `kullanici_profil.md`'yi doldur ya da ilk oturumda Claude'a anlat, o yazar.
@@ -177,6 +197,10 @@ bash scripts/archive-project.sh "Müşteri Sitesi" --reason "teslim edildi"
 git pull
 bash scripts/install.sh --lang tr
 ```
+
+v1.1'den yükseltmede de aynı komut yeter: tırnaksız ve satır içi eski hook komutları birebir eşleşmeyle
+çıkar, yerine `hooks/*.sh` çağrıları gelir. v1.1'in sessizce eklediği
+`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` değeri olduğu yerde kalır.
 
 Kurulum `settings.json`'daki iki eski hatırlatıcıyı birebir komut eşleşmesiyle çıkarır, yenisini
 ekler, eski iki dosyayı `.<tarih>.bak` yapar; başka hook'una dokunmaz. `CLAUDE.md`'n ve vault notların
@@ -208,17 +232,26 @@ saltay-kokpit/
 │   ├── project/launch.json.example         Browser pane dev sunucu kaydı
 │   └── auto-memory-redirect.md             Claude Code'un kendi hafıza dizini için yönlendirme
 ├── hooks/
-│   ├── vault-index.sh           SessionStart: kendini ölçen index (seviye 0-5 + failsafe)
+│   ├── vault-index.sh           SessionStart: kendini ölçen index (düz/klasörlü, seviye 0-5 + failsafe)
 │   ├── hook-meta.sh             stdin JSON → tool_name|file_path
+│   ├── backup.sh                PreToolUse: Edit/Write öncesi yedek (.backups/ kendini git'ten saklar)
+│   ├── secret-scan.sh           PostToolUse: sabit sır → Claude'a bildirir (exit 2)
+│   ├── change-log.sh            PostToolUse: changes.log (1 MB'ta döner)
+│   ├── session-track.sh         PostToolUse: oturum başına iş kaydı (günlük hatırlatıcı için)
+│   ├── journal-reminder.sh      Stop: iş günlüğe yazılmadan bittiyse bir kez özet ister
 │   ├── settings.hooks.json      settings.json'a birleştirilecek blok
-│   ├── settings.remove.json     eski sürümün komutları (yükseltmede kaldırılır)
+│   ├── settings.remove.json     eski sürümlerin komutları (yükseltmede kaldırılır)
+│   ├── settings.env.json        isteğe bağlı env (--disable-background-tasks)
 │   └── README.md                hook tablosu + isteğe bağlı hook'lar
 ├── scripts/
 │   ├── install.sh · install.ps1 kurulum (idempotent)
-│   ├── vault-health.sh          sağlık kontrolü
+│   ├── uninstall.sh             kaldırma (geri alınabilir)
+│   ├── vault-health.sh          sağlık kontrolü (yetim notlar dahil)
 │   ├── new-project.sh           Aktif/<ad> + .gitignore + git + vault notu + MEMORY satırı
 │   ├── archive-project.sh       Aktif → Arsiv (geri alınabilir) + vault status + karar kaydı
-│   └── merge-settings.js/.py    settings.json birleştirici
+│   ├── lib.sh                   ortak yardımcılar (Türkçe slug)
+│   └── merge-settings.js/.py    settings.json birleştirici / ayırıcı
+├── tests/run.sh                 sahte HOME'da uçtan uca testler (CI: Ubuntu, macOS, Windows)
 └── assets/                      banner
 ```
 
@@ -246,7 +279,7 @@ mesajda 5-8 paralel arama; büyük işte süre sınırı ve tahmini süre.
 Hook adları prefix'e göre bölümler; `feedback_` adları hiçbir sıkışma seviyesinde kırpılmaz.
 
 **Hook'lar:** `SessionStart` index · `UserPromptSubmit` kısa hatırlatma (~500 B) · `PreToolUse` yedek ·
-`PostToolUse` sır tarama + değişiklik logu.
+`PostToolUse` sır tarama + değişiklik logu · `Stop` günlük hatırlatıcı (iş parçası günlüğe yazılmadan bittiyse, bir kez).
 
 ## Gerçek hatalardan çıkan dersler
 

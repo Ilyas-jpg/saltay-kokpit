@@ -1,8 +1,20 @@
 {
-  "_comment": "Hook commands an older saltay-kokpit release registered and this one replaces. scripts/install.sh fills in __CLAUDE_HOME__ and removes them from ~/.claude/settings.json by exact command match before merging settings.hooks.json, so an upgrade never leaves both versions running. Keys starting with _ are ignored.",
+  "_comment": "Hook commands an older saltay-kokpit release registered and this one replaces. scripts/install.sh fills in __CLAUDE_HOME__ and removes them from ~/.claude/settings.json by exact command match before merging settings.hooks.json, so an upgrade never leaves both versions running. scripts/uninstall.sh removes these AND the current ones. Keys starting with _ are ignored.",
   "_v1.0.0": "two UserPromptSubmit reminders (1.7 KB on every prompt) replaced by session-reminder.json in v1.1.0",
+  "_v1.1.0": "unquoted paths (broke on a home folder with spaces) and inline hook commands replaced by quoted calls to hooks/*.sh in v1.2.0",
+  "SessionStart": [
+    "bash __CLAUDE_HOME__/hooks/vault-index.sh"
+  ],
   "UserPromptSubmit": [
     "cat __CLAUDE_HOME__/behavior-check-reminder.json",
-    "cat __CLAUDE_HOME__/skill-check-reminder.json"
+    "cat __CLAUDE_HOME__/skill-check-reminder.json",
+    "cat __CLAUDE_HOME__/session-reminder.json"
+  ],
+  "PreToolUse": [
+    "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); f=${m#*|}; if [[ -n \"$f\" && -f \"$f\" ]]; then mkdir -p .backups && cp \"$f\" \".backups/$(basename \"$f\").$(date +%Y%m%d_%H%M%S).bak\"; fi"
+  ],
+  "PostToolUse": [
+    "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); f=${m#*|}; if [ -n \"$f\" ] && grep -qE '(password|secret|api_?key|access_?token|private_?key)\\s*=\\s*[\"\\x27][^\"\\x27]{8,}' \"$f\" 2>/dev/null; then echo \"⚠️  Possible hardcoded secret in $f\" >&2; fi",
+    "m=$(bash __CLAUDE_HOME__/hooks/hook-meta.sh); echo \"[$(date '+%Y-%m-%d %H:%M:%S')] ${m%%|*} ${m#*|}\" >> __CLAUDE_HOME__/changes.log"
   ]
 }

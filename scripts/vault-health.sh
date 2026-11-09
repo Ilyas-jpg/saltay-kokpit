@@ -4,20 +4,26 @@
 # One-command health check for the whole setup. Run it whenever Claude "seems
 # to forget" — the two silent failures this system has met (index truncated at
 # the 10K limit, hook contract change) both show up here.
+#
+# v1.2: folders layout (per-folder counts, orphan notes), settings.json JSON
+# validity, hook script presence, secret-scan self-test, .backups/ checked in
+# the folder you ran it from (v1.1 looked inside the vault by mistake).
 # =============================================================================
 set -u
+START_DIR="$(pwd)"
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 CONF="${SALTAY_CONF:-$CLAUDE_HOME/vault.conf}"
 ok()   { printf '  ✅ %s\n' "$*"; }
 bad()  { printf '  ❌ %s\n' "$*"; FAIL=1; }
 warn() { printf '  ⚠️  %s\n' "$*"; }
 FAIL=0
+VAULT_LAYOUT="flat"
 
 echo "saltay-kokpit health"
 echo "[config]"
 if [ -f "$CONF" ]; then
   # shellcheck disable=SC1090
-  . "$CONF"; ok "vault.conf: $CONF (lang=${VAULT_LANG:-tr})"
+  . "$CONF"; ok "vault.conf: $CONF (lang=${VAULT_LANG:-tr}, layout=${VAULT_LAYOUT:-flat})"
 else
   bad "vault.conf missing: $CONF — run scripts/install.sh"; VAULT_DIR="${VAULT_DIR:-}"; VAULT_LANG="${VAULT_LANG:-tr}"
 fi
@@ -25,52 +31,106 @@ fi
 echo "[vault]"
 if [ -n "${VAULT_DIR:-}" ] && [ -d "$VAULT_DIR" ]; then
   ok "folder: $VAULT_DIR"
-  cd "$VAULT_DIR"
-  total=$(ls *.md 2>/dev/null | wc -l | tr -d ' ')
-  if [ "${VAULT_LANG:-tr}" = "en" ]; then P="user_ personal_ feedback_ reference_ project_ HANDOFF_ note_"; else P="kullanici_ kisisel_ feedback_ reference_ proje_ HANDOFF_ not_"; fi
-  line=""; for p in $P; do c=$(ls "$p"*.md 2>/dev/null | wc -l | tr -d ' '); line="$line$p$c  "; done
-  ok "notes: $total  ($line)"
-  nofm=0; for f in *.md; do [ "$f" = "MEMORY.md" ] && continue; [ "$f" = "README.md" ] && continue; head -1 "$f" | grep -q '^---' || nofm=$((nofm+1)); done
-  [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s) — description will not show in the index"
-  if [ -f MEMORY.md ]; then
-    mkb=$(( $(wc -c < MEMORY.md) / 1024 ))
-    if [ "$mkb" -gt 100 ]; then warn "MEMORY.md is ${mkb} KB — it has become a document: don't open it in sessions (Grep), shorten each line to one sentence"
-    else ok "MEMORY.md present ($(wc -l < MEMORY.md | tr -d ' ') lines, ${mkb} KB)"; fi
+  cd "$VAULT_DIR" || exit 1
+  if [ "${VAULT_LAYOUT:-flat}" = "folders" ]; then
+    # same folders the index skips: templates + EXCLUDE_DIRS (archives stay: Grep still reads them)
+    EXRX="/(Templates|templates|Şablonlar|Sablonlar|_templates$(printf '%s' "${EXCLUDE_DIRS:-}" | tr ';' '\n' | sed '/^$/d; s/[.[\*^$()+?{|]/\\&/g; s/^/|/' | tr -d '\n'))/"
+    LIST=$(find . \( -name .obsidian -o -name .trash -o -name .git -o -name node_modules \) -prune -o -type f -name '*.md' -print 2>/dev/null | grep -vE "$EXRX")
+    total=$(printf '%s\n' "$LIST" | grep -c '\.md$')
+    per=$(printf '%s\n' "$LIST" | grep '\.md$' | sed 's|^\./||; s|/[^/]*$||; s|^[^/]*\.md$|.|' | sort | uniq -c | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s %s · ", $0, c}' | sed 's/ · $//')
+    ok "notes: $total  ($per)"
+    nofm=0; nosum=0; nofm_l=""; nosum_l=""
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      if ! head -1 "$f" | grep -q '^---'; then nofm=$((nofm+1)); nofm_l="$nofm_l${nofm_l:+, }${f#./}"; continue; fi
+      head -40 "$f" | grep -qE '^(summary|description):' || { nosum=$((nosum+1)); nosum_l="$nosum_l${nosum_l:+, }${f#./}"; }
+    done <<EOF
+$LIST
+EOF
+    [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s): $(printf '%s' "$nofm_l" | cut -c1-300)"
+    [ "$nosum" -eq 0 ] && ok "summary: every note has one" || warn "$nosum note(s) without summary:/description: — no description in the index: $(printf '%s' "$nosum_l" | cut -c1-300)"
+    # orphan notes: no [[link]] to them anywhere (MOCs and root notes excluded)
+    LINKS=$(printf '%s\n' "$LIST" | grep '\.md$' | tr '\n' '\0' | xargs -0 grep -oh '\[\[[^]|#]*' 2>/dev/null | sed 's/^\[\[//; s|.*/||' | sort -u)
+    orph=""
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      case "$f" in ./*/*) ;; *) continue ;; esac
+      n=$(basename "$f" .md)
+      case "$n" in *MOC*|*README*) continue ;; esac
+      printf '%s\n' "$LINKS" | grep -qxF "$n" || orph="$orph${orph:+, }$n"
+    done <<EOF
+$LIST
+EOF
+    [ -z "$orph" ] && ok "orphan notes: none" || warn "orphan notes (no [[link]] points to them — add them to their MOC): $orph"
   else
-    bad "MEMORY.md missing"
+    total=$(ls *.md 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${VAULT_LANG:-tr}" = "en" ]; then P="user_ personal_ feedback_ reference_ project_ HANDOFF_ note_"; else P="kullanici_ kisisel_ feedback_ reference_ proje_ HANDOFF_ not_"; fi
+    line=""; for p in $P; do c=$(ls "$p"*.md 2>/dev/null | wc -l | tr -d ' '); line="$line$p$c  "; done
+    ok "notes: $total  ($line)"
+    nofm=0; for f in *.md; do [ -e "$f" ] || continue; [ "$f" = "MEMORY.md" ] && continue; [ "$f" = "README.md" ] && continue; head -1 "$f" | grep -q '^---' || nofm=$((nofm+1)); done
+    [ "$nofm" -eq 0 ] && ok "frontmatter: every note has it" || warn "frontmatter missing in $nofm note(s) — description will not show in the index"
+    if [ -f MEMORY.md ]; then
+      mkb=$(( $(wc -c < MEMORY.md) / 1024 ))
+      if [ "$mkb" -gt 100 ]; then warn "MEMORY.md is ${mkb} KB — it has become a document: don't open it in sessions (Grep), shorten each line to one sentence"
+      else ok "MEMORY.md present ($(wc -l < MEMORY.md | tr -d ' ') lines, ${mkb} KB)"; fi
+    else
+      bad "MEMORY.md missing"
+    fi
   fi
+  cd "$START_DIR" || exit 1
 else
   bad "vault folder not found: ${VAULT_DIR:-<unset>}"
 fi
 
 echo "[index hook]"
 IDX="$CLAUDE_HOME/hooks/vault-index.sh"
-if [ -x "$IDX" ] || [ -f "$IDX" ]; then
+if [ -f "$IDX" ]; then
   OUT=$(SALTAY_CONF="$CONF" bash "$IDX")
   SZ=$(printf '%s' "$OUT" | wc -c | tr -d ' ')
-  if [ "$SZ" -ge 10000 ]; then bad "index $SZ bytes ≥ 10000 — Claude sees only a 2 KB preview! archive notes now"
-  elif [ "$SZ" -gt 9500 ]; then warn "index $SZ bytes > budget 9500 — failsafe active, archive soon"
-  else ok "index $SZ bytes (< 9500 budget)"; fi
-  if printf '%s' "$OUT" | grep -qE 'seviyesi [45]|level [45]'; then warn "compression level ≥4 — project/note names shortened; time to archive stale notes"; fi
+  if [ "$SZ" -eq 0 ]; then bad "index is EMPTY — vault path wrong or no notes found"
+  elif [ "$SZ" -ge 10000 ]; then bad "index $SZ bytes ≥ 10000 — Claude sees only a 2 KB preview! archive notes now"
+  elif [ "$SZ" -gt "${BUDGET:-9500}" ]; then warn "index $SZ bytes > budget ${BUDGET:-9500} — failsafe active, archive soon"
+  else ok "index $SZ bytes (< ${BUDGET:-9500} budget)"; fi
+  if printf '%s' "$OUT" | grep -qE 'seviyesi [45]|level [45]'; then warn "compression level ≥4 — names shortened; time to archive stale notes"; fi
   if printf '%s' "$OUT" | grep -qE 'ZORLA KESILDI|FORCE-CUT'; then bad "index force-cut marker present — archive immediately"; fi
 else
   bad "hook missing: $IDX"
 fi
 
-echo "[hook-meta]"
+echo "[hook scripts]"
+for h in hook-meta.sh backup.sh secret-scan.sh change-log.sh session-track.sh journal-reminder.sh; do
+  [ -f "$CLAUDE_HOME/hooks/$h" ] && ok "hooks/$h" || bad "hooks/$h missing — run scripts/install.sh"
+done
 META="$CLAUDE_HOME/hooks/hook-meta.sh"
 if [ -f "$META" ]; then
   R=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"C:\\\\Users\\\\x\\\\a.md"}}' | bash "$META")
-  [ "$R" = "Edit|C:/Users/x/a.md" ] && ok "stdin JSON parsed: $R" || bad "unexpected output: $R"
-else
-  bad "hook-meta.sh missing"
+  [ "$R" = "Edit|C:/Users/x/a.md" ] && ok "stdin JSON parsed: $R" || bad "hook-meta unexpected output: $R"
+fi
+SCAN="$CLAUDE_HOME/hooks/secret-scan.sh"
+if [ -f "$SCAN" ]; then
+  T=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/saltay-scan.$$"); mv "$T" "$T.py" 2>/dev/null; T="$T.py"
+  printf "api_key = 'abcdefgh27x0123456'\n" > "$T"   # fake key for the self-test — saltay:allow
+  printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$T" | bash "$SCAN" 2>/dev/null; rc=$?
+  rm -f "$T"
+  [ "$rc" -eq 2 ] && ok "secret-scan self-test: caught and reported to Claude (exit 2)" || bad "secret-scan self-test failed (exit $rc, expected 2)"
 fi
 
 echo "[settings.json]"
 S="$CLAUDE_HOME/settings.json"
 if [ -f "$S" ]; then
+  if command -v node >/dev/null 2>&1; then
+    node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").replace(/^\uFEFF/,""))' "$S" 2>/dev/null && ok "valid JSON" || bad "settings.json is NOT valid JSON — Claude Code ignores it; restore the newest settings.json.*.bak"
+  fi
   grep -q 'vault-index.sh' "$S" && ok "SessionStart → vault-index.sh" || bad "SessionStart hook not registered"
-  grep -q 'hook-meta.sh' "$S" && ok "PreToolUse/PostToolUse use hook-meta.sh" || warn "backup/log hooks not registered"
+  grep -q 'backup.sh' "$S" && ok "PreToolUse → backup.sh" || warn "backup hook not registered"
+  grep -q 'secret-scan.sh' "$S" && ok "PostToolUse → secret-scan.sh + change-log.sh" || warn "secret-scan hook not registered"
+  if grep -q 'journal-reminder.sh' "$S" && grep -q 'session-track.sh' "$S"; then
+    if [ "${JOURNAL_REMIND:-1}" = "0" ]; then ok "Stop → journal-reminder.sh (turned off: JOURNAL_REMIND=0)"
+    else ok "Stop → journal-reminder.sh (after ≥${JOURNAL_MIN_EDITS:-3} edits or ≥${JOURNAL_MIN_COMMANDS:-15} commands${JOURNAL_DIR:+, journal: $JOURNAL_DIR})"; fi
+  else
+    warn "journal reminder not registered (Stop → journal-reminder.sh, PostToolUse → session-track.sh) — run scripts/install.sh"
+  fi
+  grep -q 'hooks/hook-meta.sh); f=' "$S" && warn "v1.1 inline hook commands still registered — run scripts/install.sh again (it replaces them)"
   OLDREM=0; grep -qE 'behavior-check-reminder\.json|skill-check-reminder\.json' "$S" && OLDREM=1
   if grep -q 'session-reminder.json' "$S"; then
     if [ -f "$CLAUDE_HOME/session-reminder.json" ]; then ok "UserPromptSubmit → session-reminder.json ($(wc -c < "$CLAUDE_HOME/session-reminder.json" | tr -d ' ') bytes per prompt)"
@@ -89,8 +149,12 @@ fi
 echo "[CLAUDE.md]"
 C="$CLAUDE_HOME/CLAUDE.md"
 if [ -f "$C" ]; then
-  grep -qiE 'Hafıza Protokolü|Memory Protocol' "$C" && ok "memory protocol section present" || warn "no memory protocol section — merge CLAUDE.saltay.md"
-  grep -q 'K0' "$C" && grep -q 'K5' "$C" && ok "5 canonical rules present (K0-K5)" || warn "5 canonical rules (K0-K5) missing"
+  if [ "${VAULT_LAYOUT:-flat}" = "folders" ]; then
+    grep -qiE 'vault|kasa|hafıza|memory' "$C" && ok "CLAUDE.md mentions the vault" || warn "CLAUDE.md never mentions the vault — add a memory protocol (see CLAUDE.saltay.md)"
+  else
+    grep -qiE 'Hafıza Protokolü|Memory Protocol' "$C" && ok "memory protocol section present" || warn "no memory protocol section — merge CLAUDE.saltay.md"
+    grep -q 'K0' "$C" && grep -q 'K5' "$C" && ok "5 canonical rules present (K0-K5)" || warn "5 canonical rules (K0-K5) missing"
+  fi
   ckb=$(( $(wc -c < "$C") / 1024 ))
   if [ "$ckb" -gt 15 ]; then warn "CLAUDE.md is ${ckb} KB and loads in every session — move inventory/history/long rule texts to the vault (target ≤ 12 KB)"
   else ok "CLAUDE.md ${ckb} KB"; fi
@@ -105,7 +169,21 @@ if [ -f "$CLAUDE_HOME/changes.log" ]; then
 else
   warn "changes.log not created yet (appears after the first Edit/Write)"
 fi
-if ls -d .backups 2>/dev/null >/dev/null; then ok "cwd has .backups/ ($(ls .backups | wc -l | tr -d ' ') files)"; else warn "no .backups/ in cwd yet — edit a file with Claude and check again"; fi
+# backups go to <git root>/.backups/ for repo files, ~/.claude/saltay-backups/ otherwise (v1.2)
+bk_report() {  # bk_report <dir> <label>
+  local nb kb
+  nb=$(ls "$1" | wc -l | tr -d ' ')
+  kb=$(du -sk "$1" 2>/dev/null | cut -f1)
+  if [ "${kb:-0}" -gt 51200 ]; then warn "$2: $nb files, $((kb/1024)) MB — move old ones to .curation-trash-<date>/ (never auto-deleted)"
+  else ok "$2: $nb files, ${kb:-?} KB"; fi
+  [ -f "$1/.gitignore" ] || warn "$2 has no .gitignore (created by v1.1) — add one containing * so backups are never committed"
+}
+found=0
+GROOT=$(git -C "$START_DIR" rev-parse --show-toplevel 2>/dev/null || true)
+[ -n "${SALTAY_BACKUP_DIR:-}" ] && [ -d "$SALTAY_BACKUP_DIR" ] && { bk_report "$SALTAY_BACKUP_DIR" "SALTAY_BACKUP_DIR"; found=1; }
+[ -n "$GROOT" ] && [ -d "$GROOT/.backups" ] && { bk_report "$GROOT/.backups" "repo .backups/"; found=1; }
+[ -d "$CLAUDE_HOME/saltay-backups" ] && { bk_report "$CLAUDE_HOME/saltay-backups" "~/.claude/saltay-backups/"; found=1; }
+[ "$found" -eq 1 ] || warn "no backups yet — edit a file with Claude and check again"
 
 echo
 [ "$FAIL" -eq 0 ] && echo "result: healthy" || { echo "result: PROBLEMS FOUND (see ❌)"; exit 1; }

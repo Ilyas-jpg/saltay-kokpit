@@ -5,13 +5,20 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Lang tr
 #   powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Lang en -Vault "D:\Vault"
+#   powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Vault "C:\My Vault" -Layout folders -NoProjects
 #
 # Compatible with Windows PowerShell 5.1 (no && / ternary / ?. used).
 param(
   [ValidateSet("tr","en")] [string]$Lang = "tr",
   [string]$Vault = "",
+  [ValidateSet("auto","flat","folders")] [string]$Layout = "auto",
+  [string]$CoreNotes = "",
   [string]$Projects = "",
+  [switch]$NoProjects,
+  [string]$ClaudeHome = "",
   [string]$Name = "",
+  [switch]$DisableBackgroundTasks,
+  [switch]$Uninstall,
   [switch]$DryRun
 )
 
@@ -37,6 +44,7 @@ function Find-Bash {
 function To-BashPath([string]$p) {
   if ([string]::IsNullOrEmpty($p)) { return "" }
   $full = [System.IO.Path]::GetFullPath($p)
+  if ($full.StartsWith("\\")) { return ($full -replace "\\", "/") }   # UNC: //server/share/...
   $drive = $full.Substring(0,1).ToLower()
   $rest = $full.Substring(2) -replace "\\", "/"
   return "/$drive$rest"
@@ -50,13 +58,23 @@ if (-not $bash) {
 }
 
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$script = To-BashPath (Join-Path $repo "scripts\install.sh")
-
-$bashArgs = @($script, "--lang", $Lang)
-if ($Vault -ne "")    { $bashArgs += @("--vault", (To-BashPath $Vault)) }
-if ($Projects -ne "") { $bashArgs += @("--projects", (To-BashPath $Projects)) }
-if ($Name -ne "")     { $bashArgs += @("--name", $Name) }
-if ($DryRun)          { $bashArgs += "--dry-run" }
+if ($Uninstall) {
+  $script = To-BashPath (Join-Path $repo "scripts\uninstall.sh")
+  $bashArgs = @($script)
+  if ($ClaudeHome -ne "") { $bashArgs += @("--claude-home", (To-BashPath $ClaudeHome)) }
+  if ($DryRun)            { $bashArgs += "--dry-run" }
+} else {
+  $script = To-BashPath (Join-Path $repo "scripts\install.sh")
+  $bashArgs = @($script, "--lang", $Lang, "--layout", $Layout)
+  if ($Vault -ne "")      { $bashArgs += @("--vault", (To-BashPath $Vault)) }
+  if ($CoreNotes -ne "")  { $bashArgs += @("--core-notes", $CoreNotes) }
+  if ($NoProjects)        { $bashArgs += "--no-projects" }
+  elseif ($Projects -ne "") { $bashArgs += @("--projects", (To-BashPath $Projects)) }
+  if ($ClaudeHome -ne "") { $bashArgs += @("--claude-home", (To-BashPath $ClaudeHome)) }
+  if ($Name -ne "")       { $bashArgs += @("--name", $Name) }
+  if ($DisableBackgroundTasks) { $bashArgs += "--disable-background-tasks" }
+  if ($DryRun)            { $bashArgs += "--dry-run" }
+}
 
 Write-Host "running: bash $($bashArgs -join ' ')" -ForegroundColor DarkGray
 & $bash @bashArgs

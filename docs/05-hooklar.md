@@ -1,7 +1,7 @@
 # 05 · Hook'lar — modelin iradesine bırakılmayan davranışlar
 
 Hook, Claude Code'un belirli olaylarda çalıştırdığı kabuk komutudur. Model bir şeyi yapmayı
-unutabilir; hook unutmaz. Bu sistemde beş hook var, hepsi **bash** (Windows'ta Git Bash). Hook'un
+unutabilir; hook unutmaz. Bu sistemde yedi hook var, hepsi **bash** (Windows'ta Git Bash). Hook'un
 çıktısı da her oturumda ya da her prompt'ta bağlama girer; bu yüzden kısa tutulur.
 
 ## Hook tablosu
@@ -10,13 +10,16 @@ unutabilir; hook unutmaz. Bu sistemde beş hook var, hepsi **bash** (Windows'ta 
 |---|---|---|---|
 | `SessionStart` | — | `vault-index.sh`: vault index'ini basar | Hafızanın **koşulsuz** yüklenmesi. Tek en önemli hook. |
 | `UserPromptSubmit` | — | `session-reminder.json` içeriğini (~500 B) prompt'a ekler | Hafıza protokolü, brief'in son paragrafı ve 🔴 dışında izin sorma: her prompt'ta gelir. Uzun oturumda context sıkıştırılınca anayasa bile silikleşir; bu hatırlatma sıkıştırmayı atlatır. |
-| `PreToolUse` | `Edit\|MultiEdit` | `./.backups/<ad>.<tarih>.bak` kopyası | Yeşil ışığın ("düzenle, sorma") dayanağı. |
-| `PostToolUse` | `Edit\|Write` | `password = "…"` kalıbında sabit sır arar, uyarır | Sır sızıntısı en ucuz burada yakalanır. |
-| `PostToolUse` | `Edit\|MultiEdit\|Write` | `~/.claude/changes.log`'a `[zaman] Araç yol` | Denetim izi; hook sağlığının da göstergesi. |
+| `PreToolUse` | `Edit\|MultiEdit\|Write` | `backup.sh`: `<repo kökü>/.backups/` (repo dışı: `~/.claude/saltay-backups/`) altına `<ad>.<yol-checksum>.<tarih>.bak` | Yeşil ışığın ("düzenle, sorma") dayanağı. `Write` bir dosyayı tamamen ezer; v1.1 onu yedeklemiyordu. Oturumun cwd'sine yazmak yedekleri (OneDrive'lı) Masaüstüne saçıyordu. |
+| `PostToolUse` | `Edit\|MultiEdit\|Write` | `secret-scan.sh`: sabit sır (atama, `"key": "…"`, `sk-ant-`, `ghp_`, `AKIA` …) arar, **exit 2** ile Claude'a bildirir | Sır sızıntısı en ucuz burada yakalanır. Exit 0'daki stderr modele hiç ulaşmaz (v1.1 dersi). |
+| `PostToolUse` | `Edit\|MultiEdit\|Write` | `change-log.sh`: `~/.claude/changes.log`'a `[zaman] Araç yol` (1 MB'ta döner, silinmez) | Denetim izi; hook sağlığının da göstergesi. |
+| `PostToolUse` | `…\|NotebookEdit\|Bash` | `session-track.sh`: oturum başına iş kaydı | Günlük hatırlatıcısının girdisi. |
+| `Stop` | — | `journal-reminder.sh`: gerçek iş günlüğe yazılmadan bittiyse bir kez özet ister | "Önemli işin sonunda özet yaz" koşullu bir talimattır; ders 1'deki gibi tam da yoğun oturumda atlanır. |
 
 `settings.json` biçimi `hooks/settings.hooks.json` içinde; `install.sh` `__CLAUDE_HOME__` yer
-tutucusunu gerçek yolla değiştirip mevcut ayarlara **birleştirir** (mevcut hook'ları silmez, aynı
-komutu ikinci kez eklemez).
+tutucusunu gerçek yolla (tırnaklı, boşluklu ev klasörü çalışır) değiştirip mevcut ayarlara
+**birleştirir** (mevcut hook'ları silmez, aynı komutu ikinci kez eklemez, eski sürüm komutlarını
+birebir eşleşmeyle çıkarır). Kaldırmak: `scripts/uninstall.sh`.
 
 İsteğe bağlı iki hook (git auto-add, ilgili testleri koştur) `hooks/README.md`'de; herkes istemez
 diye varsayılan blokta yok.
